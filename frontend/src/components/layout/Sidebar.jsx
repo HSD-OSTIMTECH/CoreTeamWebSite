@@ -26,7 +26,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       <div className="sidebar-logo">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
           <div className="logo-icon" style={{ backgroundColor: 'white', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <img src="/favicon_io (1)/android-chrome-192x192.png" alt="C" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <img src="/favicon_io%20(1)/android-chrome-512x512.png" alt="C" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
             <div className="logo-text">HSD OSTIMTECH</div>

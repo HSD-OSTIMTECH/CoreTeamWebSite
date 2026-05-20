@@ -25,24 +25,35 @@ function Login() {
     setError(null);
 
     try {
-      // Custom users tablosu için RPC çağrısı yapıyoruz
-      const { data, error: authError } = await supabase.rpc('authenticate_user', {
-        p_username: username,
-        p_password: password
+      // Backend API'sine çağrı yapıyoruz
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username,
+          password
+        })
       });
 
-      if (authError) throw authError;
+      const data = await response.json();
 
-      if (data && data.success) {
+      if (!response.ok) {
+        throw new Error(data.error || 'Giriş başarısız');
+      }
+
+      if (data.user) {
         localStorage.setItem('custom_user', JSON.stringify(data.user));
+        localStorage.setItem('token', data.token);
         window.dispatchEvent(new Event('storage'));
         navigate('/dashboard');
       } else {
-        setError(data?.error || 'Giriş bilgileri hatalı.');
+        setError(data.error || 'Giriş bilgileri hatalı.');
       }
       
     } catch (err) {
-      setError('Giriş başarısız: ' + (err.message || 'Sunucu hatası'));
+      setError(err.message || 'Giriş başarısız: Sunucu hatası');
     } finally {
       setLoading(false);
     }
@@ -110,7 +121,7 @@ function Login() {
             justifyContent: 'center'
           }}>
             <img 
-              src="/favicon_io (1)/android-chrome-512x512.png" 
+              src="/favicon_io%20(1)/android-chrome-512x512.png" 
               alt="Logo" 
               style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
             />

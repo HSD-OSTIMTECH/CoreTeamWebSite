@@ -9,14 +9,14 @@ CoreTeam, modern ve kullanıcı dostu bir arayüze sahip, kulüp ve topluluk yö
 - **Styling:** Vanilla CSS (Modern ve responsive tasarım)
 - **İkonlar:** Lucide React
 - **Routing:** React Router DOM
-- **Veritabanı Bağlantısı:** Supabase JS SDK
+- **API İletişimi:** Native Fetch API (RESTful)
 
 ### Backend
 - **Runtime:** Node.js
 - **Framework:** Express.js
 - **Kimlik Doğrulama:** JSON Web Token (JWT) & Bcrypt
 - **Veritabanı:** Supabase (PostgreSQL)
-- **Middleware:** CORS, Dotenv
+- **Middleware:** CORS, Dotenv, Express JSON
 
 ---
 
@@ -27,89 +27,170 @@ Projeyi yerel makinenizde çalıştırmak için aşağıdaki adımları izleyin.
 ### 1. Ön Gereksinimler
 - Node.js (v16 veya üstü)
 - npm veya yarn
+- Supabase hesabı ve projesi
 
-```bash
-git clone [PROJECT_URL]
-```
+### 2. Supabase Yapılandırması
 
-### 2. Backend Kurulumu
+1. [Supabase Dashboard](https://app.supabase.com) → Projeniz → **Settings** → **API**
+2. Aşağıdaki bilgileri not edin:
+   - **Project URL** → `VITE_SUPABASE_URL` / `SUPABASE_URL`
+   - **Anon Public Key** → `VITE_SUPABASE_KEY` (⚠️ Secret Key değil!)
+   - **Service Role Key** → `SUPABASE_KEY` (yalnızca backend için)
 
-1. `ct/backend` dizinine gidin:
+### 3. Backend Kurulumu
+
+1. `backend` dizinine gidin:
    ```bash
-   cd ct/backend
+   cd backend
    ```
 2. Gerekli paketleri yükleyin:
    ```bash
    npm install
    ```
-3. `.env` dosyasını oluşturun veya kontrol edin. Aşağıdaki değişkenlerin tanımlı olduğundan emin olun:
+3. `.env` dosyasını oluşturun:
    ```env
-   SUPABASE_URL=adresiniz
-   SUPABASE_KEY=anahtarınız
-   JWT_SECRET=gizli_anahtar
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_KEY=your-service-role-key-here
+   JWT_SECRET=your-secret-key-change-in-production
    PORT=5000
    ```
 4. Sunucuyu başlatın:
    ```bash
-   node server.js
+   npm run dev
    ```
-   *Sunucu varsayılan olarak `http://localhost:5000` adresinde çalışacaktır.*
+   *Sunucu `http://localhost:5000` adresinde çalışacaktır.*
 
-### 3. Frontend Kurulumu
+### 4. Frontend Kurulumu
 
-1. `ct/frontend` dizinine gidin:
+1. `frontend` dizinine gidin:
    ```bash
-   cd ct/frontend
+   cd frontend
    ```
 2. Gerekli paketleri yükleyin:
    ```bash
    npm install
    ```
-3. Uygulamayı geliştirme modunda başlatın:
+3. `.env.local` dosyasını oluşturun:
+   ```env
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_KEY=your-anon-public-key-here
+   ```
+4. Uygulamayı geliştirme modunda başlatın:
    ```bash
    npm run dev
    ```
-   *Uygulama varsayılan olarak `http://localhost:5173` adresinde çalışacaktır.*
+   *Uygulama `http://localhost:5173` adresinde çalışacaktır.*
 
 ---
 
 ## 📂 Proje Yapısı
 
 ```text
-CoreTeam/
-├── ct/
-│   ├── backend/            # Express.js API klasörü
-│   │   ├── routes/         # API uç noktaları
-│   │   ├── server.js       # Ana sunucu dosyası
-│   │   └── package.json    # Backend bağımlılıkları
-│   └── frontend/           # React Uygulaması
-│       ├── src/
-│       │   ├── components/ # Tekrar kullanılabilir UI bileşenleri
-│       │   ├── pages/      # Dashboard sayfaları (Dashboard, Events, Support, vb.)
-│       │   ├── lib/        # Supabase istemcisi vb.
-│       │   └── App.jsx     # Ana uygulama bileşeni
-│       └── package.json    # Frontend bağımlılıkları
-└── README.md
+CoreTeamWebSite/
+├── backend/
+│   ├── routes/
+│   │   └── auth.js          # Kimlik doğrulama ve API endpoints
+│   ├── server.js            # Ana sunucu dosyası
+│   ├── package.json         # Backend bağımlılıkları
+│   └── .env                 # Çevre değişkenleri
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # Tekrar kullanılabilir UI bileşenleri
+│   │   │   ├── common/      # Card, Badge gibi temel bileşenler
+│   │   │   └── layout/      # Header, Sidebar, MainLayout
+│   │   ├── pages/           # Dashboard sayfaları
+│   │   ├── lib/             # Supabase client
+│   │   ├── App.jsx          # Ana uygulama bileşeni
+│   │   ├── main.jsx         # Entry point
+│   │   └── index.css        # Global stiller
+│   ├── index.html           # HTML template
+│   ├── vite.config.js       # Vite konfigürasyonu
+│   ├── package.json         # Frontend bağımlılıkları
+│   └── .env.local           # Çevre değişkenleri (⚠️ .gitignore'a ekle)
+├── README.md
+└── vercel.json              # Vercel deployment konfigürasyonu
 ```
+
+---
+
+## 🔌 API Endpoints
+
+### Kimlik Doğrulama
+- `POST /api/auth/login` - Kullanıcı girişi
+- `GET /api/auth/users` - Tüm kullanıcıları listele
+
+### Bildirimler
+- `GET /api/auth/notifications/:userId` - Kullanıcının bildirimlerini al
+- `PUT /api/auth/notifications/:userId/mark-read` - Bildirimleri okundu işaretle
 
 ---
 
 ## ✨ Özellikler
 
-- **Modern Dashboard:** Kulüp istatistiklerini ve aktivitelerini takip edebileceğiniz şık bir ana sayfa.
-- **Etkinlik Yönetimi:** Kulüp etkinliklerini görüntüleme ve yönetme.
-- **Responsive Tasarım:** Mobil, tablet ve masaüstü cihazlarla tam uyumlu arayüz.
-- **Güvenli Giriş:** JWT tabanlı kimlik doğrulama sistemi.
-- **Destek Sistemi:** Kullanıcıların sorun bildirebileceği destek sayfası.
-- **Sidebar Navigasyonu:** Hızlı ve kolay erişim sağlayan dinamik yan menü.
+- **Modern Dashboard:** Kulüp istatistiklerini ve aktivitelerini takip edebileceğiniz şık ana sayfa
+- **Görev Yönetimi:** Sosyal Medya, Projeler ve Teknoloji görevlerinin kanban tablosu
+- **Etkinlik Yönetimi:** Kulüp etkinliklerini görüntüleme ve sponsorluk takibi
+- **Responsive Tasarım:** Mobil, tablet ve masaüstü cihazlarla tam uyumlu
+- **Güvenli Giriş:** JWT tabanlı kimlik doğrulama sistemi
+- **Bildirim Sistemi:** Gerçek zamanlı bildirimler (polling ile)
+- **Dark Mode:** Tema değiştirme desteği
+- **Responsive Sidebar:** Mobil uyumlu navigasyon menüsü
+
+---
+
+## ⚙️ Sistem Gereksinimleri
+
+### Supabase Tabloları
+Aşağıdaki tabloların Supabase'de oluşturulmuş olması gerekir:
+- `custom_users` - Kullanıcı bilgileri
+- `tasks` - Görevler
+- `task_assignments` - Görev atanmış kişiler
+- `notifications` - Bildirimler
+- `announcements` - Duyurular
+- `events` - Etkinlikler
+
+### Row Level Security (RLS)
+- Supabase RLS policies'leri uygun şekilde yapılandırılmalıdır
+- Backend Service Role Key'i kullanmak daha güvenlidir
 
 ---
 
 ## 📝 Önemli Notlar
-- Proje veritabanı olarak **Supabase** kullanmaktadır. Tablo yapılarınızın Supabase üzerinde hazır olması gerekmektedir.
-- Frontend tarafındaki API bağlantıları `src/lib/supabaseClient.js` üzerinden yönetilmektedir.
+
+⚠️ **Supabase Key'leri:**
+- Frontend: **Anon Public Key** kullanmalı (`VITE_SUPABASE_KEY`)
+- Backend: **Service Role Key** kullanmalı (`SUPABASE_KEY`)
+- Secret key'leri browser'da kullanmayın!
+
+⚠️ **.env dosyaları:**
+- `.env` ve `.env.local` dosyalarını `.gitignore`'a ekleyin
+- Production'da güvenli değişken yönetimi kullanın
+
+⚠️ **Çalıştırma Sırası:**
+1. Backend'i ilk başlatın
+2. Frontend'i ikinci başlatın
+3. Frontend'in localhost:5000'e erişebildiğinden emin olun
 
 ---
 
-## 🤝 İletişim
-Bu proje CoreTeam ekibi tarafından geliştirilmiştir. Bir sorunla karşılaşırsanız lütfen bir issue açın veya geliştirici ekibe ulaşın.
+## 🚀 Production Deployment
+
+### Vercel (Frontend)
+```bash
+npm run build
+# vercel deploy
+```
+
+### Backend Deployment
+- Heroku, Railway, Render gibi platformlara deploy yapabilirsiniz
+- `SUPABASE_URL` ve `SUPABASE_KEY` environment variable'larını ayarlayın
+- `PORT` değişkenini dinamik tutun
+
+---
+
+## 🤝 İletişim ve Destek
+
+Bu proje CoreTeam ekibi tarafından geliştirilmiştir. Bir sorunla karşılaşırsanız lütfen:
+- Issue açın
+- Geliştirici ekibe ulaşın
+- Destek sayfasından bildiriş gönderin

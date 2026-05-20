@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useNavigate } from 'react-router-dom';
 import { 
   Bell, Plus, X, Search, CheckSquare, User, 
   Trash2, Filter, AlertCircle, Info, Megaphone,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 const Announcements = () => {
+  const navigate = useNavigate();
   const MANAGER_RANKS = ['başkan', 'başkan yardımcısı', 'komite başkanı', 'yönetici', 'developer'];
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,36 +36,58 @@ const Announcements = () => {
     setLoading(true);
     try {
       const savedUser = localStorage.getItem('custom_user');
-      const userObj = savedUser ? JSON.parse(savedUser) : null;
+      
+      if (!savedUser) {
+        console.warn('Kullanıcı oturumu bulunamadı');
+        navigate('/login');
+        return;
+      }
+
+      let userObj;
+      try {
+        userObj = JSON.parse(savedUser);
+      } catch (parseErr) {
+        console.error('Kullanıcı bilgisi parse hatası:', parseErr);
+        localStorage.removeItem('custom_user');
+        navigate('/login');
+        return;
+      }
+
+      if (!userObj || !userObj.id) {
+        console.warn('Kullanıcı ID eksik');
+        navigate('/login');
+        return;
+      }
+
       setCurrentUser(userObj);
 
-      if (userObj) {
-        // Duyuruları çek
-        const { data, error } = await supabase
-          .from('announcements')
-          .select(`
-            *,
-            announcement_recipients!inner(user_id, is_read)
-          `)
-          .eq('announcement_recipients.user_id', userObj.id)
-          .order('created_at', { ascending: false });
-
-        if (error && error.code !== '42P01') {
-          console.error('Duyuru çekme hatası:', error);
-        } else {
+      // Duyuruları Backend API'den çek
+      try {
+        const response = await fetch(`http://localhost:5000/api/auth/announcements/${userObj.id}`);
+        if (response.ok) {
+          const data = await response.json();
           setAnnouncements(data || []);
+        } else {
+          const errorData = await response.json();
+          console.error('Duyuru çekme hatası:', errorData);
         }
+      } catch (fetchErr) {
+        console.error('Backend bağlantı hatası:', fetchErr);
+      }
 
-        // Yönetici ise üyeleri çek
-        const userRank = normalizeRank(userObj.rank);
-        const isManager = MANAGER_RANKS.includes(userRank);
-        
-        if (isManager) {
-          const { data: mems, error: memErr } = await supabase
-            .from('custom_users')
-            .select('id, username, rank')
-            .order('username');
-          if (!memErr) setMembers(mems || []);
+      // Yönetici ise üyeleri çek
+      const userRank = normalizeRank(userObj.rank);
+      const isManager = MANAGER_RANKS.includes(userRank);
+      
+      if (isManager) {
+        try {
+          const memsResponse = await fetch('http://localhost:5000/api/auth/users');
+          if (memsResponse.ok) {
+            const mems = await memsResponse.json();
+            setMembers(mems || []);
+          }
+        } catch (memErr) {
+          console.error('Üye listesi çekme hatası:', memErr);
         }
       }
     } catch (err) {
@@ -83,37 +106,22 @@ const Announcements = () => {
 
     setIsSubmitting(true);
     try {
-      const { data: annData, error: annError } = await supabase
-        .from('announcements')
-        .insert([{
+      const response = await fetch('http://localhost:5000/api/auth/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           title: formData.title,
           content: formData.content,
           creator_id: currentUser.id,
-          creator_name: currentUser.username || 'Bilinmiyor'
-        }])
-        .select()
-        .single();
+          creator_name: currentUser.username || 'Bilinmiyor',
+          recipient_ids: formData.recipients
+        })
+      });
 
-      if (annError) throw annError;
-
-      const recipientData = formData.recipients.map(userId => ({
-        announcement_id: annData.id,
-        user_id: userId
-      }));
-
-      const { error: recError } = await supabase
-        .from('announcement_recipients')
-        .insert(recipientData);
-
-      if (recError) throw recError;
-
-      const notificationData = formData.recipients.map(userId => ({
-        user_id: userId,
-        message: `📢 Yeni Duyuru: ${formData.title}`,
-        is_read: false
-      }));
-
-      await supabase.from('notifications').insert(notificationData);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Duyuru oluşturulamadı');
+      }
 
       setShowModal(false);
       setFormData({ title: '', content: '', recipients: [] });

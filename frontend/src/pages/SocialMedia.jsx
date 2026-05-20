@@ -50,8 +50,14 @@ const SocialMedia = ({ canEdit = true }) => {
   }, []);
 
   const fetchMembers = async () => {
-    const { data, error } = await supabase.from('custom_users').select('id, username, rank');
-    if (!error) setMembers(data || []);
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/users');
+      const data = await response.json();
+      setMembers(data || []);
+    } catch (err) {
+      console.error('Kullanıcı listesi alınamadı:', err);
+      setMembers([]);
+    }
   };
 
   const fetchCommitteeTasks = async () => {

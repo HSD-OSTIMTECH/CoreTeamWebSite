@@ -38,15 +38,11 @@ const Header = ({ toggleSidebar }) => {
   };
 
   const fetchNotifications = async (userId) => {
+    if (!userId) return;
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      if (error) throw error;
+      const response = await fetch(`http://localhost:5000/api/auth/notifications/${userId}`);
+      if (!response.ok) throw new Error('Bildirimler alınamadı');
+      const data = await response.json();
       setNotifications(data || []);
       setUnreadCount(data?.filter(n => !n.is_read).length || 0);
     } catch (err) {
@@ -55,14 +51,13 @@ const Header = ({ toggleSidebar }) => {
   };
 
   const markAsRead = async () => {
-    if (!user || unreadCount === 0) return;
+    if (!user?.id || unreadCount === 0) return;
     try {
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
-      
+      const response = await fetch(`http://localhost:5000/api/auth/notifications/${user.id}/mark-read`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Bildirimler güncellenemedi');
       setUnreadCount(0);
       setNotifications(notifications.map(n => ({ ...n, is_read: true })));
     } catch (err) {
@@ -83,20 +78,19 @@ const Header = ({ toggleSidebar }) => {
     window.addEventListener('open-profile', handleOpenProfile);
     window.addEventListener('toggle-notifications', handleToggleNotifications);
 
-    // Realtime bildirimleri dinle
-    const channel = supabase
-      .channel('public:notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user?.id}` }, (payload) => {
-        setNotifications(prev => [payload.new, ...prev].slice(0, 10));
-        setUnreadCount(prev => prev + 1);
-      })
-      .subscribe();
+    // Bildirim polling (her 30 saniyede kontrol et)
+    let pollInterval;
+    if (user?.id) {
+      pollInterval = setInterval(() => {
+        fetchNotifications(user.id);
+      }, 30000);
+    }
 
     return () => {
       window.removeEventListener('storage', fetchUser);
       window.removeEventListener('open-profile', handleOpenProfile);
       window.removeEventListener('toggle-notifications', handleToggleNotifications);
-      supabase.removeChannel(channel);
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [user?.id]);
 
