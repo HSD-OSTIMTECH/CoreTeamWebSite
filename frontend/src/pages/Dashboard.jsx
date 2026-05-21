@@ -1,6 +1,7 @@
 import React from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, X, Link as LinkIcon, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { getDateConstraints } from '../lib/dateConstraints';
 import './Dashboard.css';
 
 const DAY_LABELS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
@@ -413,13 +414,20 @@ const Dashboard = () => {
 
   const calendarCells = React.useMemo(() => buildCalendarCells(visibleMonth), [visibleMonth]);
   const todayKey = toDateKey(new Date());
+  const { minDate, maxDate } = getDateConstraints();
 
   const previousMonth = () => {
-    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1));
+    const newMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
+    if (newMonth >= minDate) {
+      setVisibleMonth(newMonth);
+    }
   };
 
   const nextMonth = () => {
-    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1));
+    const newMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1);
+    if (newMonth <= maxDate) {
+      setVisibleMonth(newMonth);
+    }
   };
 
   const monthLabel = visibleMonth.toLocaleDateString('tr-TR', {
@@ -487,11 +495,23 @@ const Dashboard = () => {
               <h3>Takvim</h3>
             </div>
             <div className="dashboard-month-switcher">
-              <button type="button" onClick={previousMonth} aria-label="Onceki ay">
+              <button 
+                type="button" 
+                onClick={previousMonth} 
+                aria-label="Onceki ay"
+                disabled={visibleMonth.getFullYear() === minDate.getFullYear() && visibleMonth.getMonth() === minDate.getMonth()}
+                style={{ opacity: visibleMonth.getFullYear() === minDate.getFullYear() && visibleMonth.getMonth() === minDate.getMonth() ? 0.5 : 1, cursor: visibleMonth.getFullYear() === minDate.getFullYear() && visibleMonth.getMonth() === minDate.getMonth() ? 'not-allowed' : 'pointer' }}
+              >
                 <ChevronLeft size={16} />
               </button>
               <strong>{monthLabel}</strong>
-              <button type="button" onClick={nextMonth} aria-label="Sonraki ay">
+              <button 
+                type="button" 
+                onClick={nextMonth} 
+                aria-label="Sonraki ay"
+                disabled={visibleMonth.getFullYear() === maxDate.getFullYear() && visibleMonth.getMonth() === maxDate.getMonth()}
+                style={{ opacity: visibleMonth.getFullYear() === maxDate.getFullYear() && visibleMonth.getMonth() === maxDate.getMonth() ? 0.5 : 1, cursor: visibleMonth.getFullYear() === maxDate.getFullYear() && visibleMonth.getMonth() === maxDate.getMonth() ? 'not-allowed' : 'pointer' }}
+              >
                 <ChevronRight size={16} />
               </button>
             </div>
