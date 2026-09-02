@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Search, Bell, HelpCircle, User, Menu, X, LogOut, Info, AlertCircle } from 'lucide-react';
+import { Search, Bell, HelpCircle, User, Menu, X, LogOut, Info, AlertCircle, Sun, Moon } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { API_BASE_URL, getAuthHeaders } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -12,6 +12,7 @@ const Header = ({ toggleSidebar }) => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const navigate = useNavigate();
+  const [isDarkMode, setIsDarkMode] = useState(document.body.classList.contains('dark-mode'));
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
@@ -117,26 +118,16 @@ const Header = ({ toggleSidebar }) => {
   const hasRole = (role) => canSeeAll || (user?.roles && user.roles.includes(role));
 
   return (
-    <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <header className="header">
       <div className="header-left">
-        <button className="menu-toggle" onClick={toggleSidebar}>
-          <Menu size={24} />
+        <button className="menu-toggle" onClick={toggleSidebar} aria-label="Menüyü Aç">
+          <Menu size={22} />
         </button>
-        <div className="header-tabs hide-mobile">
-          <NavLink to="/dashboard" className={({ isActive }) => `tab ${isActive ? 'active' : ''}`}>Genel Bakış</NavLink>
-          <NavLink to="/announcements" className={({ isActive }) => `tab ${isActive ? 'active' : ''}`}>Duyurular</NavLink>
-          <NavLink to="/tasks" className={({ isActive }) => `tab ${isActive ? 'active' : ''}`}>Görevlerim</NavLink>
-          
-          <NavLink to="/events" className={({ isActive }) => `tab ${isActive ? 'active' : ''}`}>Etkinlik ve Sponsorluk</NavLink>
-          <NavLink to="/social-media" className={({ isActive }) => `tab ${isActive ? 'active' : ''}`}>Sosyal Medya</NavLink>
-          <NavLink to="/medium" className={({ isActive }) => `tab ${isActive ? 'active' : ''}`}>Medium</NavLink>
-          <NavLink to="/projects" className={({ isActive }) => `tab ${isActive ? 'active' : ''}`}>Teknoloji ve Proje</NavLink>
-        </div>
       </div>
 
       <div className="header-actions" style={{ position: 'relative' }}>
         {rank && (
-          <span style={{ fontSize: '0.65rem', fontWeight: '700', color: 'var(--primary-color)', backgroundColor: 'var(--primary-bg)', padding: '0.2rem 0.5rem', borderRadius: '12px', textTransform: 'uppercase', marginRight: '0.4rem' }}>
+          <span style={{ fontSize: '0.68rem', fontWeight: '700', color: 'var(--primary-color)', backgroundColor: 'var(--primary-bg)', padding: '0.25rem 0.6rem', borderRadius: '12px', textTransform: 'uppercase', marginRight: '0.4rem', border: '1px solid rgba(225, 29, 72, 0.15)' }}>
             {rank}
           </span>
         )}
@@ -145,12 +136,13 @@ const Header = ({ toggleSidebar }) => {
           onClick={() => {
             const isDark = document.body.classList.toggle('dark-mode');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            setIsDarkMode(isDark);
             window.dispatchEvent(new Event('storage'));
           }}
-          title="Temayı Değiştir"
+          title={isDarkMode ? "Açık Mod'a Geç" : "Koyu Mod'a Geç"}
           style={{ marginRight: '0.2rem' }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
         <button 
           className="btn-icon-only" 
@@ -169,7 +161,7 @@ const Header = ({ toggleSidebar }) => {
               right: '5px',
               width: '8px',
               height: '8px',
-              backgroundColor: '#ef4444',
+              backgroundColor: 'var(--primary-color)',
               borderRadius: '50%',
               border: '2px solid var(--surface-color)'
             }}></span>
