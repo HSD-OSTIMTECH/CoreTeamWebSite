@@ -180,36 +180,48 @@ a {
 }
 
 body.dark-mode {
-  --bg-color: #0f172a;
+  --bg-color: #0b1329;
   --surface-color: #1e293b;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --border-color: #334155;
+  --primary-bg: rgba(15, 118, 110, 0.25);
+  --danger-bg: rgba(239, 68, 68, 0.2);
+  --warning-bg: rgba(245, 158, 11, 0.2);
+  --success-bg: rgba(16, 185, 129, 0.2);
+  --info-bg: rgba(59, 130, 246, 0.2);
 }
 
-body.dark-mode [style*="background-color: white"],
-body.dark-mode [style*="backgroundColor: white"], 
-body.dark-mode [style*="backgroundColor: 'white'"],
-body.dark-mode [style*="rgb(255, 255, 255)"],
-body.dark-mode [style*="#fff"],
-body.dark-mode [style*="#ffffff"],
-body.dark-mode .card,
-body.dark-mode table,
-body.dark-mode tr,
-body.dark-mode td,
-body.dark-mode th {
-    background-color: var(--surface-color) !important;
-    color: var(--text-main) !important;
+body.dark-mode input,
+body.dark-mode textarea,
+body.dark-mode select {
+  background-color: var(--surface-color) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
 }
 
-body.dark-mode [style*="background-color: #f8fafc"],
-body.dark-mode [style*="backgroundColor: '#f8fafc'"],
-body.dark-mode [style*="background-color: #f1f5f9"],
-body.dark-mode [style*="backgroundColor: '#f1f5f9'"],
-body.dark-mode [style*="rgb(248, 250, 252)"],
-body.dark-mode [style*="rgb(241, 245, 249)"],
-body.dark-mode [style*="#f8fafc"],
-body.dark-mode [style*="#f1f5f9"] {
-    background-color: var(--bg-color) !important;
-    border-color: var(--border-color) !important;
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Animations */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
