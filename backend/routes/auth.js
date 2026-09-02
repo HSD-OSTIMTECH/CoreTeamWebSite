@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { verifyTokenOptional } from './authMiddleware.js';
 
 dotenv.config();
 
@@ -10,7 +11,15 @@ const router = express.Router();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('⚠️ [Backend] SUPABASE_URL veya SUPABASE_KEY tanımlanmamış. Lütfen backend/.env dosyanızı kontrol edin.');
+}
+
+const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder-key');
+
+// Parse incoming Bearer tokens if present (non-breaking)
+router.use(verifyTokenOptional);
 
 router.post('/login', async (req, res) => {
   try {

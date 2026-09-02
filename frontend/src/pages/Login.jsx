@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { API_BASE_URL } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { Lock, User, ChevronRight, Sun, Moon, Eye, EyeOff } from 'lucide-react';
 
 function Login() {
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -26,7 +29,7 @@ function Login() {
 
     try {
       // Backend API'sine çağrı yapıyoruz
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -44,9 +47,7 @@ function Login() {
       }
 
       if (data.user) {
-        localStorage.setItem('custom_user', JSON.stringify(data.user));
-        localStorage.setItem('token', data.token);
-        window.dispatchEvent(new Event('storage'));
+        login(data.user, data.token);
         navigate('/dashboard');
       } else {
         setError(data.error || 'Giriş bilgileri hatalı.');
@@ -121,9 +122,14 @@ function Login() {
             justifyContent: 'center'
           }}>
             <img 
-              src="/favicon_io%20(1)/android-chrome-512x512.png" 
-              alt="Logo" 
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+              src="/icons/huawei-hsd-logo-transparent.png" 
+              alt="HSD Logo" 
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'contain',
+                filter: isDarkMode ? 'none' : 'invert(1)'
+              }} 
             />
           </div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '8px' }}>Hoş Geldiniz</h1>

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from './lib/supabaseClient';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './pages/Dashboard';
 import SocialMedia from './pages/SocialMedia';
@@ -11,68 +10,19 @@ import Support from './pages/Support';
 import Events from './pages/Events';
 import Login from './pages/Login';
 import Announcements from './pages/Announcements';
+import { useAuth } from './context/AuthContext';
+import { canManageCommittee } from './lib/roles';
 
 function App() {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkSession = async () => {
-      // Önce standart Supabase Auth'u kontrol et
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      
-      // Eğer standart auth yoksa localStorage'daki özel kullanıcıyı kontrol et
-      const customUser = localStorage.getItem('custom_user');
-      
-      if (authSession) {
-        setSession(authSession);
-      } else if (customUser) {
-        // Özel kullanıcı varsa mock bir session objesi oluşturuyoruz
-        setSession({ user: JSON.parse(customUser), isCustom: true });
-      } else {
-        setSession(null);
-      }
-      setLoading(false);
-    };
-
-    checkSession();
-
-    // Standart auth değişikliklerini dinle
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setSession(session);
-      } else {
-        // Standart session yoksa özel tabloyu tekrar kontrol et
-        const customUser = localStorage.getItem('custom_user');
-        setSession(customUser ? { user: JSON.parse(customUser), isCustom: true } : null);
-      }
-    });
-
-    // Manuel login/logout eventlerini dinle (localStorage güncellendiğinde)
-    const handleStorageChange = () => {
-      const customUser = localStorage.getItem('custom_user');
-      if (customUser) {
-        setSession({ user: JSON.parse(customUser), isCustom: true });
-      } else {
-        checkSession();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      subscription.unsubscribe();
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
+  const { user, session, loading } = useAuth();
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>Yükleniyor...</div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
+        Yükleniyor...
+      </div>
+    );
   }
-
-  const user = session?.user;
-  const normalizedRank = String(user?.rank || '').toLocaleLowerCase('tr-TR').trim();
-  const canSeeAll = ['başkan', 'komite başkanı', 'developer'].includes(normalizedRank);
-  const hasRole = (role) => canSeeAll || (user?.roles && user.roles.includes(role));
 
   return (
     <Routes>
@@ -85,19 +35,19 @@ function App() {
         {/* Komite Sayfaları - Görüntüleme Herkese Açık, Düzenleme Yetkiye Bağlı */}
         <Route 
           path="events" 
-          element={<Events canEdit={hasRole('etkinlik')} />} 
+          element={<Events canEdit={canManageCommittee(user, 'etkinlik')} />} 
         />
         <Route 
           path="social-media" 
-          element={<SocialMedia canEdit={hasRole('sosyal')} />} 
+          element={<SocialMedia canEdit={canManageCommittee(user, 'sosyal')} />} 
         />
         <Route 
           path="medium" 
-          element={<MediumPanel canEdit={hasRole('medium')} />} 
+          element={<MediumPanel canEdit={canManageCommittee(user, 'medium')} />} 
         />
         <Route 
           path="projects" 
-          element={<Projects canEdit={hasRole('proje')} />} 
+          element={<Projects canEdit={canManageCommittee(user, 'proje')} />} 
         />
 
         <Route path="tasks" element={<MyTasks />} />
