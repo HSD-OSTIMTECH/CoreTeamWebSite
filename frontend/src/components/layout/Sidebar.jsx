@@ -1,32 +1,24 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 import { LayoutDashboard, CheckSquare, FileText, Cpu, Calendar, Settings, LogOut, Plus, X, Bell, User, LifeBuoy, Megaphone } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('custom_user');
-    window.dispatchEvent(new Event('storage'));
+    await logout();
     navigate('/login');
   };
-
-  const customUserString = localStorage.getItem('custom_user');
-  const user = customUserString ? JSON.parse(customUserString) : null;
-
-  const normalizedRank = String(user?.rank || '').toLocaleLowerCase('tr-TR').trim();
-  const canSeeAll = ['başkan', 'komite başkanı', 'developer'].includes(normalizedRank);
-  const hasRole = (role) => canSeeAll || user?.roles?.includes(role);
 
   return (
     <div className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-logo">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-          <div className="logo-icon" style={{ backgroundColor: 'white', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <img src="/favicon_io%20(1)/android-chrome-512x512.png" alt="C" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          <div className="logo-icon">
+            <img src="/icons/huawei-hsd-logo-transparent.png" alt="HSD" className="sidebar-logo-img" />
           </div>
           <div>
             <div className="logo-text">HSD OSTIMTECH</div>
@@ -88,7 +80,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <span>Profilim</span>
           </div>
           <div className="nav-item" onClick={() => {
-            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
             window.dispatchEvent(new Event('storage'));
           }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
