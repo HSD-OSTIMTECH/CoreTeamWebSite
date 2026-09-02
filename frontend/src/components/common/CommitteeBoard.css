@@ -1,0 +1,179 @@
+/* ==========================================================================
+   CommitteeBoard Component Ultra-Responsive Styles
+   ========================================================================== */
+
+/* 1. Sayfa Düzeni */
+.committee-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+  margin-bottom: 3rem;
+}
+
+/* Çok geniş ekranlarda (>= 1500px) yan yana durabilme esnekliği */
+@media (min-width: 1500px) {
+  .committee-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+  }
+}
+
+/* 2. Kanban Taşıyıcısı */
+.committee-board-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 3 Sütunlu Dengeli Eşit Izgara (Sıkışma ve taşmayı 100% önler) */
+.committee-board-container {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  min-height: 520px;
+  width: 100%;
+}
+
+/* 3. Sütun Kartı */
+.committee-column {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-width: 0; /* Grid içinde taşmayı önler */
+}
+
+.committee-column:hover {
+  border-color: color-mix(in srgb, var(--primary-color) 40%, var(--border-color));
+}
+
+.committee-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.committee-column-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.committee-column-count {
+  background: var(--bg-color);
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+/* 4. Görev Kartları Listesi */
+.committee-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  flex: 1;
+  min-height: 120px;
+}
+
+/* 5. Görev Ekle Butonu */
+.committee-add-btn {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  margin-top: 0.75rem;
+}
+
+.committee-add-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: var(--primary-bg);
+}
+
+/* 6. Yaklaşan Akış Kartı */
+.committee-upcoming-card {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.committee-upcoming-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.committee-upcoming-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+/* Yaklaşan Akış Liste / Grid Düzeni */
+.committee-upcoming-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
+}
+
+@media (min-width: 1500px) {
+  .committee-upcoming-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 560px;
+    overflow-y: auto;
+  }
+}
+
+/* 7. Tablet ve Küçük Ekran Uyumluluğu (< 960px) */
+@media (max-width: 960px) {
+  .committee-board-container {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .committee-column {
+    min-width: 280px;
+    flex: 0 0 280px;
+    scroll-snap-align: start;
+  }
+
+  .committee-upcoming-list {
+    grid-template-columns: 1fr;
+  }
+}
