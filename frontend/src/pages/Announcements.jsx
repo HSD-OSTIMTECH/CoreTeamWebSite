@@ -5,10 +5,13 @@ import {
   Trash2, Filter, AlertCircle, Info, Megaphone,
   UserCheck, Users, Send, Calendar
 } from 'lucide-react';
+import { API_BASE_URL, getAuthHeaders } from '../lib/api';
+import { isManager, normalizeRank } from '../lib/roles';
+import { useToast } from '../context/ToastContext';
 
 const Announcements = () => {
   const navigate = useNavigate();
-  const MANAGER_RANKS = ['başkan', 'başkan yardımcısı', 'komite başkanı', 'yönetici', 'developer'];
+  const { success, error: toastError, warning } = useToast();
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -27,10 +30,6 @@ const Announcements = () => {
   useEffect(() => {
     fetchData();
   }, []);
-
-  const normalizeRank = (rank) => {
-    return String(rank || '').toLocaleLowerCase('tr-TR').trim();
-  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -63,7 +62,9 @@ const Announcements = () => {
 
       // Duyuruları Backend API'den çek
       try {
-        const response = await fetch(`http://localhost:5000/api/auth/announcements/${userObj.id}`);
+        const response = await fetch(`${API_BASE_URL}/api/auth/announcements/${userObj.id}`, {
+          headers: getAuthHeaders()
+        });
         if (response.ok) {
           const data = await response.json();
           setAnnouncements(data || []);
@@ -76,12 +77,11 @@ const Announcements = () => {
       }
 
       // Yönetici ise üyeleri çek
-      const userRank = normalizeRank(userObj.rank);
-      const isManager = MANAGER_RANKS.includes(userRank);
-      
-      if (isManager) {
+      if (isManager(userObj)) {
         try {
-          const memsResponse = await fetch('http://localhost:5000/api/auth/users');
+          const memsResponse = await fetch(`${API_BASE_URL}/api/auth/users`, {
+            headers: getAuthHeaders()
+          });
           if (memsResponse.ok) {
             const mems = await memsResponse.json();
             setMembers(mems || []);
@@ -100,15 +100,15 @@ const Announcements = () => {
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
     if (formData.recipients.length === 0) {
-      alert('Lütfen en az bir alıcı seçin.');
+      warning('Lütfen en az bir alıcı seçin.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('http://localhost:5000/api/auth/announcements', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/announcements`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           title: formData.title,
           content: formData.content,
@@ -126,10 +126,10 @@ const Announcements = () => {
       setShowModal(false);
       setFormData({ title: '', content: '', recipients: [] });
       await fetchData();
-      alert('Duyuru başarıyla yayınlandı.');
+      success('Duyuru başarıyla yayınlandı.');
     } catch (err) {
       console.error('Hata:', err);
-      alert('Hata oluştu: ' + (err.message || 'Veritabanı hatası'));
+      toastError('Hata oluştu: ' + (err.message || 'Veritabanı hatası'));
     } finally {
       setIsSubmitting(false);
     }
@@ -148,8 +148,7 @@ const Announcements = () => {
     normalizeRank(m.rank).includes(searchTerm.toLowerCase())
   );
 
-  const currentUserRank = normalizeRank(currentUser?.rank);
-  const isManager = MANAGER_RANKS.includes(currentUserRank);
+  const canCreate = isManager(currentUser);
 
   return (
     <div className="page-container">
@@ -159,7 +158,7 @@ const Announcements = () => {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Önemli güncellemeler ve duyuruları buradan takip edebilirsiniz.</p>
         </div>
         
-        {isManager && (
+        {canCreate && (
           <button 
             onClick={() => setShowModal(true)}
             style={{ 
