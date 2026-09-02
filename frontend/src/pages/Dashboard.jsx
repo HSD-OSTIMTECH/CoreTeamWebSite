@@ -253,23 +253,12 @@ const Dashboard = () => {
   return (
     <div className="page-container">
       {/* Banner */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, var(--primary-color) 0%, #0f766e 100%)',
-          borderRadius: '24px',
-          padding: '2rem',
-          marginBottom: '2.5rem',
-          color: 'white',
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: '0 10px 25px -5px rgba(15, 118, 110, 0.2)'
-        }}
-      >
+      <div className="dashboard-hero-banner">
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', color: 'white' }}>
+          <h1 className="dashboard-hero-title">
             Hoş Geldin, {welcomeName}! 👋
           </h1>
-          <p style={{ opacity: 0.9, fontSize: '1rem', maxWidth: '600px', margin: 0, lineHeight: 1.5 }}>
+          <p className="dashboard-hero-subtitle">
             Kulüp projeleri, etkinlik takvimi ve sana atanan görevleri buradan takip edebilirsin.
           </p>
         </div>

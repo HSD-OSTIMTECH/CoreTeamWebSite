@@ -1,26 +1,35 @@
 :root {
+  /* Surfaces & Base */
   --bg-color: #f8fafc;
   --surface-color: #ffffff;
-  --primary-color: #0f766e; /* Teal 700 */
-  --primary-light: #14b8a6; /* Teal 500 */
-  --primary-bg: #ccfbf1; /* Teal 50 */
+  --surface-card: #ffffff;
   
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --border-color: #e2e8f0;
+  /* Huawei Crimson Brand (Energetic, Modern Red) */
+  --primary-color: #e11d48;       /* Rose 600 */
+  --primary-hover: #be123c;       /* Rose 700 */
+  --primary-light: #fb7185;       /* Rose 400 */
+  --primary-bg: #fff1f2;          /* Rose 50 */
+  --primary-glow: rgba(225, 29, 72, 0.22);
   
-  --danger: #ef4444;       
-  --danger-bg: #fee2e2;    
+  /* Modern Typography & Neutral Slate */
+  --text-main: #0f172a;           /* Slate 900 */
+  --text-muted: #64748b;          /* Slate 500 */
+  --border-color: #e2e8f0;        /* Slate 200 */
+  
+  /* Functional Status Colors */
+  --danger: #e11d48;       
+  --danger-bg: #fff1f2;    
   --warning: #f59e0b;      
   --warning-bg: #fef3c7;   
   --success: #10b981;      
   --success-bg: #d1fae5;   
-  --info: #3b82f6;         
-  --info-bg: #dbeafe;      
+  --info: #0ea5e9;         
+  --info-bg: #e0f2fe;      
 
+  /* Elevation Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
 }
 
 * {
@@ -132,7 +141,7 @@ a {
 }
 
 .btn-primary:hover {
-  background-color: #0d645c;
+  background-color: var(--primary-hover);
 }
 
 .btn-outline {
@@ -180,16 +189,25 @@ a {
 }
 
 body.dark-mode {
-  --bg-color: #0b1329;
-  --surface-color: #1e293b;
+  /* Huawei HarmonyOS Obsidian Dark Surfaces */
+  --bg-color: #0b0d13;            /* Pure Tech Obsidian */
+  --surface-color: #131722;       /* Slate Obsidian Surface */
+  --surface-card: #181d2a;        /* Elevated Card */
+  
+  --primary-color: #f43f5e;       /* Rose 500 (slight luminance boost for dark contrast) */
+  --primary-hover: #e11d48;       /* Rose 600 */
+  --primary-light: #fda4af;       /* Rose 300 */
+  --primary-bg: rgba(244, 63, 94, 0.15);
+  --primary-glow: rgba(244, 63, 94, 0.35);
+
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --border-color: #334155;
-  --primary-bg: rgba(15, 118, 110, 0.25);
-  --danger-bg: rgba(239, 68, 68, 0.2);
-  --warning-bg: rgba(245, 158, 11, 0.2);
-  --success-bg: rgba(16, 185, 129, 0.2);
-  --info-bg: rgba(59, 130, 246, 0.2);
+  --border-color: #232938;        /* Refined dark border */
+  
+  --danger-bg: rgba(244, 63, 94, 0.18);
+  --warning-bg: rgba(245, 158, 11, 0.18);
+  --success-bg: rgba(16, 185, 129, 0.18);
+  --info-bg: rgba(14, 165, 233, 0.18);
 }
 
 body.dark-mode input,

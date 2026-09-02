@@ -264,7 +264,7 @@ function Login() {
             }}
             onMouseDown={(e) => !loading && (e.currentTarget.style.transform = 'scale(0.98)')}
             onMouseUp={(e) => !loading && (e.currentTarget.style.transform = 'scale(1)')}
-            onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = '#0d645c')}
+            onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = 'var(--primary-hover)')}
             onMouseOut={(e) => !loading && (e.currentTarget.style.backgroundColor = 'var(--primary-color)')}
           >
             {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}

@@ -2,6 +2,41 @@
    Dashboard Page Styles
    ========================================================================== */
 
+/* 0. Hero Karşılama Banner */
+.dashboard-hero-banner {
+  background: linear-gradient(135deg, #be123c 0%, #e11d48 55%, #f43f5e 100%);
+  border-radius: 24px;
+  padding: 2.25rem 2.5rem;
+  margin-bottom: 2rem;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 14px 32px -8px rgba(225, 29, 72, 0.32);
+}
+
+body.dark-mode .dashboard-hero-banner {
+  background: linear-gradient(135deg, #181520 0%, #26121d 50%, #3d1222 100%);
+  border: 1px solid rgba(244, 63, 94, 0.28);
+  box-shadow: 0 14px 36px -8px rgba(244, 63, 94, 0.22);
+}
+
+.dashboard-hero-title {
+  font-size: 2.1rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-hero-subtitle {
+  opacity: 0.94;
+  font-size: 1rem;
+  max-width: 620px;
+  margin: 0;
+  line-height: 1.55;
+  color: #fce7f3;
+}
+
 /* 1. İstatistik Kartları Grid */
 .dashboard-stats-grid {
   display: grid;
