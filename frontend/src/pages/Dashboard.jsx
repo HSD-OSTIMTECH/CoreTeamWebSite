@@ -1,13 +1,14 @@
-import React from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, X, Link as LinkIcon, FileText } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  CalendarDays, ChevronLeft, ChevronRight, ClipboardList, X, 
+  Link as LinkIcon, FileText, CheckCircle2, Clock, ListTodo 
+} from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 import { getDateConstraints } from '../lib/dateConstraints';
 import './Dashboard.css';
 
 const DAY_LABELS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
-const DATE_FIELDS = ['date', 'dueDate', 'deadline', 'eventDate', 'startDate', 'endDate', 'createdAt', 'updatedAt', 'tarih'];
-const TITLE_FIELDS = ['title', 'name', 'task', 'taskName', 'eventName', 'subject', 'description', 'content'];
-const MANAGER_RANKS = ['BASKAN', 'BASKAN YARDIMCISI', 'KOMITE BASKANI'];
 const COMPLETED_STATUSES = ['completed', 'tamamlandı', 'done', 'bitti', 'tamamlanan'];
 
 const toDateKey = (date) => {
@@ -24,53 +25,19 @@ const isCompletedTask = (status) => {
   return COMPLETED_STATUSES.includes(s);
 };
 
-const isManagerUser = (user) => {
-  const rank = normalizeText(user?.rank)
-    .replace(/ş/g, 's')
-    .replace(/ğ/g, 'g')
-    .replace(/ı/g, 'i')
-    .replace(/ö/g, 'o')
-    .replace(/ü/g, 'u')
-    .toUpperCase();
-
-  return MANAGER_RANKS.includes(rank);
-};
-
 const parsePossibleDate = (rawValue) => {
   if (!rawValue) return null;
-
   if (rawValue instanceof Date && !Number.isNaN(rawValue.getTime())) {
     return new Date(rawValue.getFullYear(), rawValue.getMonth(), rawValue.getDate());
   }
-
-  if (typeof rawValue === 'number') {
-    const fromNumber = new Date(rawValue);
-    if (!Number.isNaN(fromNumber.getTime())) {
-      return new Date(fromNumber.getFullYear(), fromNumber.getMonth(), fromNumber.getDate());
-    }
-  }
-
   if (typeof rawValue === 'string') {
     const trimmed = rawValue.trim();
     if (!trimmed) return null;
-
     const nativeParsed = new Date(trimmed);
     if (!Number.isNaN(nativeParsed.getTime())) {
       return new Date(nativeParsed.getFullYear(), nativeParsed.getMonth(), nativeParsed.getDate());
     }
-
-    const trDateMatch = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
-    if (trDateMatch) {
-      const day = Number(trDateMatch[1]);
-      const month = Number(trDateMatch[2]);
-      const year = Number(trDateMatch[3]);
-      const trParsed = new Date(year, month - 1, day);
-      if (!Number.isNaN(trParsed.getTime())) {
-        return new Date(trParsed.getFullYear(), trParsed.getMonth(), trParsed.getDate());
-      }
-    }
   }
-
   return null;
 };
 
@@ -81,187 +48,6 @@ const formatDisplayName = (value) => {
     .map((part) => part.trim())
     .filter(Boolean)
     .join(' ');
-};
-
-const pickFirstString = (record, fields) => {
-  for (const field of fields) {
-    const value = record?.[field];
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-  return null;
-};
-
-const extractAssignees = (record) => {
-  const assignees = [];
-
-  const directAssigneeFields = ['assignee', 'assignedTo', 'owner', 'user', 'username', 'responsible'];
-  directAssigneeFields.forEach((field) => {
-    const value = record?.[field];
-    if (typeof value === 'string' && value.trim()) {
-      assignees.push(value.trim());
-    }
-  });
-
-  if (Array.isArray(record?.avatars)) {
-    record.avatars.forEach((avatar) => {
-      if (typeof avatar === 'string' && avatar.trim()) {
-        assignees.push(avatar.trim());
-      }
-    });
-  }
-
-  return Array.from(new Set(assignees));
-};
-
-const normalizeScheduleItem = (item, sourceKey, index) => {
-  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
-
-  const rawDate = DATE_FIELDS.map((field) => item[field]).find(Boolean);
-  const date = parsePossibleDate(rawDate);
-  if (!date) return null;
-
-  const title = pickFirstString(item, TITLE_FIELDS) || `${sourceKey} kaydi`;
-  const sourceType = /event|etkinlik/i.test(sourceKey) || /event|etkinlik/i.test(item?.type || '') ? 'event' : 'task';
-  const status = pickFirstString(item, ['status', 'columnId', 'stage']) || '';
-
-  return {
-    id: `${sourceKey}-${index}`,
-    title,
-    date,
-    type: sourceType,
-    status,
-    assignees: extractAssignees(item)
-  };
-};
-
-const readStorageSchedule = () => {
-  const records = [];
-
-  for (let i = 0; i < localStorage.length; i += 1) {
-    const key = localStorage.key(i);
-    if (!key || !/(task|event|etkinlik|gorev|görev|calendar|plan|todo|project)/i.test(key)) {
-      continue;
-    }
-
-    const rawValue = localStorage.getItem(key);
-    if (!rawValue) continue;
-
-    try {
-      const parsed = JSON.parse(rawValue);
-      const candidates = Array.isArray(parsed) ? parsed : [];
-      candidates.forEach((candidate, index) => {
-        const normalized = normalizeScheduleItem(candidate, key, index);
-        if (normalized) {
-          records.push(normalized);
-        }
-      });
-    } catch (_) {
-      // Ignore non-JSON localStorage values.
-    }
-  }
-
-  return records;
-};
-
-const normalizeBackendTask = (task, currentUser) => {
-  if (!task || typeof task !== 'object') return null;
-
-  const assignments = Array.isArray(task.task_assignments) ? task.task_assignments : [];
-  const completedCount = assignments.length > 0 
-    ? assignments.filter((a) => isCompletedTask(a?.status)).length 
-    : 0;
-
-  // DB'den gelen status 'completed' ise veya kanban'da bitmişse tamamlandı kabul et
-  const dbStatus = normalizeText(task.status || 'pending');
-  const isFinishedInBoard = /TAMAMLANAN|TAMAMLANDI/i.test(normalizeText(task.column_id || ''));
-
-  let status = 'pending';
-
-  if (isFinishedInBoard || isCompletedTask(dbStatus)) {
-    status = 'completed';
-  } else if (assignments.length > 0) {
-    // Tüm atananlar bitirdiyse tamamlandı say
-    status = completedCount === assignments.length ? 'completed' : 'pending';
-  } else {
-    // Sütun tamamlandı değilse ve atama yoksa pending
-    status = 'pending';
-  }
-
-  const date = parsePossibleDate(
-    task.due_date || task.dueDate || task.start_date || task.startDate ||
-    task.end_date || task.endDate || task.created_at || task.updated_at ||
-    task.createdAt || task.updatedAt
-  ) || new Date(task.created_at || task.createdAt || Date.now());
-
-  return {
-    id: `supabase-${task.id}`,
-    title: task.title || task.name || `Görev ${task.id}`,
-    description: task.description || '',
-    committee: task.committee || 'genel',
-    link_url: task.link_url || '',
-    attachment_url: task.attachment_url || '',
-    creator_name: task.creator_name || 'Bilinmiyor',
-    date,
-    startDate: parsePossibleDate(task.start_date || task.startDate),
-    endDate: parsePossibleDate(task.end_date || task.endDate),
-    type: 'task',
-    status,
-    assignees: assignments.map((a) => a.user_name || a.username || '').filter(Boolean)
-  };
-};
-
-const fetchAssignedTasks = async (currentUser, setBackendTasks) => {
-  if (!currentUser?.id) {
-    setBackendTasks([]);
-    return;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*, task_assignments(*)')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      throw error;
-    }
-
-    if (!Array.isArray(data)) {
-      setBackendTasks([]);
-      return;
-    }
-
-    const relevantTasks = data.filter((task) => {
-      const assignments = Array.isArray(task?.task_assignments) ? task.task_assignments : [];
-      return assignments.some((assignment) => String(assignment.user_id) === String(currentUser.id));
-    });
-
-    const normalized = relevantTasks
-      .map((task) => normalizeBackendTask(task, currentUser))
-      .filter(Boolean);
-
-    setBackendTasks(normalized);
-  } catch (err) {
-    console.error('Dashboard görevleri alınırken hata oluştu:', err);
-    setBackendTasks([]);
-  }
-};
-
-const isAssignedToCurrentUser = (task, currentUsername) => {
-  if (!task.assignees.length || !currentUsername) return false;
-
-  const normalizedCurrent = normalizeText(currentUsername);
-  return task.assignees.some((assignee) => {
-    const normalizedAssignee = normalizeText(assignee);
-    return (
-      normalizedAssignee === 'ben' ||
-      normalizedAssignee === normalizedCurrent ||
-      normalizedAssignee.includes(normalizedCurrent) ||
-      normalizedCurrent.includes(normalizedAssignee)
-    );
-  });
 };
 
 const buildCalendarCells = (visibleMonth) => {
@@ -302,84 +88,114 @@ const buildCalendarCells = (visibleMonth) => {
 };
 
 const Dashboard = () => {
-  const [user, setUser] = React.useState(null);
-  const [scheduleItems, setScheduleItems] = React.useState([]);
-  const [backendTasks, setBackendTasks] = React.useState([]);
-  const [selectedItem, setSelectedItem] = React.useState(null);
-  const [visibleMonth, setVisibleMonth] = React.useState(() => {
+  const { user } = useAuth();
+  const [allTasks, setAllTasks] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  React.useEffect(() => {
-    const loadDashboardData = async () => {
-      const savedUser = localStorage.getItem('custom_user');
-      let currentUser = savedUser ? JSON.parse(savedUser) : null;
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          task_assignments (
+            user_id,
+            user_name,
+            status
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(200);
 
-      if (!currentUser) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        currentUser = sessionData?.session?.user || null;
-      }
+      if (error) throw error;
 
-      if (currentUser) {
-        setUser(currentUser);
-      }
+      const normalized = (data || []).map((t) => {
+        const assignments = Array.isArray(t.task_assignments) ? t.task_assignments : [];
+        const isFinishedInBoard = /TAMAMLANAN|TAMAMLANDI/i.test(normalizeText(t.column_id || ''));
+        const isDbCompleted = isCompletedTask(t.status);
+        const status = (isFinishedInBoard || isDbCompleted) ? 'completed' : 'pending';
 
-      setScheduleItems(readStorageSchedule());
-      await fetchAssignedTasks(currentUser, setBackendTasks);
-    };
+        const startDate = parsePossibleDate(t.start_date);
+        const endDate = parsePossibleDate(t.end_date);
+        const date = startDate || endDate || parsePossibleDate(t.created_at) || new Date();
 
+        return {
+          id: `supabase-${t.id}`,
+          rawId: t.id,
+          title: t.title || 'İsimsiz Görev',
+          description: t.description || '',
+          committee: t.committee || 'genel',
+          link_url: t.link_url || '',
+          attachment_url: t.attachment_url || '',
+          creator_name: t.creator_name || 'Bilinmiyor',
+          startDate,
+          endDate,
+          date,
+          status,
+          type: t.committee === 'etkinlik' ? 'event' : 'task',
+          assignees: assignments.map((a) => a.user_name).filter(Boolean),
+          assignmentUserIds: assignments.map((a) => String(a.user_id))
+        };
+      });
+
+      setAllTasks(normalized);
+    } catch (err) {
+      console.error('Dashboard verileri yüklenemedi:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadDashboardData();
-    window.addEventListener('storage', loadDashboardData);
-    window.addEventListener('focus', loadDashboardData);
+
+    // Supabase Realtime aboneliği
+    const channel = supabase
+      .channel('realtime-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        loadDashboardData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignments' }, () => {
+        loadDashboardData();
+      })
+      .subscribe();
+
     window.addEventListener('dashboard-refresh', loadDashboardData);
 
     return () => {
-      window.removeEventListener('storage', loadDashboardData);
-      window.removeEventListener('focus', loadDashboardData);
+      supabase.removeChannel(channel);
       window.removeEventListener('dashboard-refresh', loadDashboardData);
     };
-  }, []);
+  }, [user?.id]);
 
-  const localTaskItems = React.useMemo(
-    () => scheduleItems.filter((item) => item.type === 'task'),
-    [scheduleItems]
-  );
-
-  const localAssignedTasks = React.useMemo(() => {
-    const currentUsername = user?.username || '';
-    if (!currentUsername) return [];
-    return localTaskItems.filter((task) => isAssignedToCurrentUser(task, currentUsername));
-  }, [localTaskItems, user]);
-
-  const taskItems = React.useMemo(
-    () => [...localTaskItems, ...backendTasks],
-    [localTaskItems, backendTasks]
-  );
-
-  const eventItems = React.useMemo(
-    () => [...scheduleItems, ...backendTasks].filter((item) => item.type === 'event'),
-    [scheduleItems, backendTasks]
-  );
-
-  const assignedTasks = React.useMemo(() => {
-    return [...localAssignedTasks, ...backendTasks]
+  // Kullanıcıya atanan görevler
+  const assignedTasks = useMemo(() => {
+    if (!user?.id) return [];
+    return allTasks
+      .filter((t) => t.assignmentUserIds.includes(String(user.id)))
       .sort((a, b) => a.date - b.date)
       .slice(0, 8);
-  }, [localAssignedTasks, backendTasks]);
+  }, [allTasks, user?.id]);
 
-  const stats = React.useMemo(() => {
+  // Kullanıcı istatistikleri
+  const stats = useMemo(() => {
     const total = assignedTasks.length;
-    const completed = assignedTasks.filter((task) => isCompletedTask(task.status)).length;
+    const completed = assignedTasks.filter((t) => isCompletedTask(t.status)).length;
     const pending = Math.max(0, total - completed);
     return { total, completed, pending };
   }, [assignedTasks]);
 
-  const calendarMap = React.useMemo(() => {
+  // Takvim haritası (tüm kulüp görev ve etkinlikleri)
+  const calendarMap = useMemo(() => {
     const map = new Map();
-    const allItems = [...scheduleItems, ...backendTasks];
-    
-    allItems.forEach((item) => {
+
+    allTasks.forEach((item) => {
       const addMapping = (d) => {
         const key = toDateKey(d);
         if (!map.has(key)) {
@@ -387,18 +203,14 @@ const Dashboard = () => {
         }
         const collection = map.get(key);
         const list = item.type === 'event' ? collection.events : collection.tasks;
-        if (!list.find(x => x.id === item.id)) {
+        if (!list.find((x) => x.id === item.id)) {
           list.push(item);
         }
       };
 
-      if (item.type === 'task') {
-        // Genel bakista gorevler sadece bitis tarihine isaretlenir.
-        addMapping(item.endDate || item.date);
-      } else if (item.startDate && item.endDate) {
+      if (item.startDate && item.endDate) {
         let current = new Date(item.startDate);
         const limit = new Date(item.endDate);
-        // Maksimum 31 gun gosterelim ki browser donmasin (guvenlik onlemi)
         let count = 0;
         while (current <= limit && count < 31) {
           addMapping(current);
@@ -406,13 +218,14 @@ const Dashboard = () => {
           count++;
         }
       } else {
-        addMapping(item.date);
+        addMapping(item.endDate || item.startDate || item.date);
       }
     });
-    return map;
-  }, [scheduleItems, backendTasks]);
 
-  const calendarCells = React.useMemo(() => buildCalendarCells(visibleMonth), [visibleMonth]);
+    return map;
+  }, [allTasks]);
+
+  const calendarCells = useMemo(() => buildCalendarCells(visibleMonth), [visibleMonth]);
   const todayKey = toDateKey(new Date());
   const { minDate, maxDate } = getDateConstraints();
 
@@ -435,10 +248,11 @@ const Dashboard = () => {
     year: 'numeric'
   });
 
-  const welcomeName = formatDisplayName(user?.username || user?.email || '') || 'Kullanici';
+  const welcomeName = formatDisplayName(user?.username || user?.email || '') || 'Kullanıcı';
 
   return (
     <div className="page-container">
+      {/* Banner */}
       <div
         style={{
           background: 'linear-gradient(135deg, var(--primary-color) 0%, #0f766e 100%)',
@@ -448,69 +262,83 @@ const Dashboard = () => {
           color: 'white',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: '0 20px 25px -5px rgba(15, 118, 110, 0.2)'
+          boxShadow: '0 10px 25px -5px rgba(15, 118, 110, 0.2)'
         }}
       >
-        <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '150px', height: '150px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', blur: '40px' }}></div>
-        <div style={{ position: 'absolute', bottom: '-40px', left: '10%', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', blur: '20px' }}></div>
-
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <p style={{ fontSize: '0.875rem', fontWeight: '500', opacity: 0.9, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })}
-          </p>
-          <h1 style={{ fontSize: '2.25rem', fontWeight: '800', marginBottom: '0', lineHeight: '1.2' }}>
-            Hoş Geldin, {welcomeName}
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', color: 'white' }}>
+            Hoş Geldin, {welcomeName}! 👋
           </h1>
-        </div>
-      </div>
-        
-      {/*
-      <div className="section-header" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-main)' }}>İstatistik Özeti</h2>
-      </div>
-      */}
-
-      <div className="dashboard-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--surface-color)', borderRadius: '1rem', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Toplam Akış</h3>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--text-main)', marginTop: '0.5rem' }}>{stats.total}</p>
-        </div>
-
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--surface-color)', borderRadius: '1rem', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Tamamlanan</h3>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--success)', marginTop: '0.5rem' }}>{stats.completed}</p>
-        </div>
-
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--surface-color)', borderRadius: '1rem', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Bekleyen</h3>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--warning)', marginTop: '0.5rem' }}>{stats.pending}</p>
+          <p style={{ opacity: 0.9, fontSize: '1rem', maxWidth: '600px', margin: 0, lineHeight: 1.5 }}>
+            Kulüp projeleri, etkinlik takvimi ve sana atanan görevleri buradan takip edebilirsin.
+          </p>
         </div>
       </div>
 
-      <div className="dashboard-planner-grid">
+      {/* İstatistik Kartları */}
+      <div className="dashboard-stats-grid">
+        <div className="dashboard-stat-card stat-total">
+          <div className="dashboard-stat-header">
+            <span className="dashboard-stat-label">Bana Atanan Görevler</span>
+            <div className="dashboard-stat-icon">
+              <ListTodo size={20} />
+            </div>
+          </div>
+          <span className="dashboard-stat-value">{stats.total}</span>
+        </div>
+
+        <div className="dashboard-stat-card stat-completed">
+          <div className="dashboard-stat-header">
+            <span className="dashboard-stat-label">Tamamlanan Görevlerim</span>
+            <div className="dashboard-stat-icon">
+              <CheckCircle2 size={20} />
+            </div>
+          </div>
+          <span className="dashboard-stat-value">{stats.completed}</span>
+        </div>
+
+        <div className="dashboard-stat-card stat-pending">
+          <div className="dashboard-stat-header">
+            <span className="dashboard-stat-label">Bekleyen Görevlerim</span>
+            <div className="dashboard-stat-icon">
+              <Clock size={20} />
+            </div>
+          </div>
+          <span className="dashboard-stat-value">{stats.pending}</span>
+        </div>
+      </div>
+
+      <div className="dashboard-main-grid">
+        {/* Ortak Kulüp Takvimi */}
         <section className="dashboard-card dashboard-calendar-card">
           <div className="dashboard-card-header">
             <div className="dashboard-card-title-wrap">
               <CalendarDays size={18} />
-              <h3>Takvim</h3>
+              <h3>Kulüp Ajandası & Takvim</h3>
             </div>
-            <div className="dashboard-month-switcher">
-              <button 
-                type="button" 
-                onClick={previousMonth} 
-                aria-label="Onceki ay"
+            <div className="dashboard-calendar-controls">
+              <button
+                type="button"
+                onClick={previousMonth}
+                aria-label="Önceki ay"
                 disabled={visibleMonth.getFullYear() === minDate.getFullYear() && visibleMonth.getMonth() === minDate.getMonth()}
-                style={{ opacity: visibleMonth.getFullYear() === minDate.getFullYear() && visibleMonth.getMonth() === minDate.getMonth() ? 0.5 : 1, cursor: visibleMonth.getFullYear() === minDate.getFullYear() && visibleMonth.getMonth() === minDate.getMonth() ? 'not-allowed' : 'pointer' }}
+                style={{
+                  opacity: visibleMonth.getFullYear() === minDate.getFullYear() && visibleMonth.getMonth() === minDate.getMonth() ? 0.5 : 1,
+                  cursor: visibleMonth.getFullYear() === minDate.getFullYear() && visibleMonth.getMonth() === minDate.getMonth() ? 'not-allowed' : 'pointer'
+                }}
               >
                 <ChevronLeft size={16} />
               </button>
               <strong>{monthLabel}</strong>
-              <button 
-                type="button" 
-                onClick={nextMonth} 
+              <button
+                type="button"
+                onClick={nextMonth}
                 aria-label="Sonraki ay"
                 disabled={visibleMonth.getFullYear() === maxDate.getFullYear() && visibleMonth.getMonth() === maxDate.getMonth()}
-                style={{ opacity: visibleMonth.getFullYear() === maxDate.getFullYear() && visibleMonth.getMonth() === maxDate.getMonth() ? 0.5 : 1, cursor: visibleMonth.getFullYear() === maxDate.getFullYear() && visibleMonth.getMonth() === maxDate.getMonth() ? 'not-allowed' : 'pointer' }}
+                style={{
+                  opacity: visibleMonth.getFullYear() === maxDate.getFullYear() && visibleMonth.getMonth() === maxDate.getMonth() ? 0.5 : 1,
+                  cursor: visibleMonth.getFullYear() === maxDate.getFullYear() && visibleMonth.getMonth() === maxDate.getMonth() ? 'not-allowed' : 'pointer'
+                }}
               >
                 <ChevronRight size={16} />
               </button>
@@ -526,19 +354,21 @@ const Dashboard = () => {
           <div className="dashboard-calendar-grid">
             {calendarCells.map((cell) => {
               const dayItems = calendarMap.get(cell.key) || { tasks: [], events: [] };
-              const hasTask = dayItems.tasks.length > 0;
-              const hasEvent = dayItems.events.length > 0;
+              const allDayItems = [...dayItems.events, ...dayItems.tasks];
+              const hasItems = allDayItems.length > 0;
 
               return (
                 <div
                   key={cell.key}
                   className={`dashboard-calendar-cell ${cell.inCurrentMonth ? '' : 'is-outside'} ${cell.key === todayKey ? 'is-today' : ''}`}
+                  style={{ cursor: hasItems ? 'pointer' : 'default' }}
+                  onClick={() => hasItems && setSelectedItem(allDayItems[0])}
                 >
                   <span className="dashboard-day-number">{cell.day}</span>
 
-                  {(hasTask || hasEvent) && (
+                  {hasItems && (
                     <div className="dashboard-day-markers" style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', justifyContent: 'center', marginTop: '4px' }}>
-                      {[...dayItems.events, ...dayItems.tasks].map((item, idx) => {
+                      {allDayItems.map((item, idx) => {
                         const comm = (item.committee || 'genel').toLowerCase();
                         let letter = comm.charAt(0).toUpperCase();
                         let bgColor = 'var(--primary-color)';
@@ -546,13 +376,24 @@ const Dashboard = () => {
                         if (comm === 'proje') { bgColor = '#3b82f6'; letter = 'P'; }
                         if (comm === 'medium') { bgColor = '#10b981'; letter = 'M'; }
                         if (comm === 'sosyal') { bgColor = '#f59e0b'; letter = 'S'; }
-                        
+
                         return (
-                          <span key={`${item.id}-${idx}`} style={{ 
-                            width: '14px', height: '14px', borderRadius: '50%', backgroundColor: bgColor, 
-                            color: 'white', fontSize: '8px', fontWeight: 'bold', display: 'flex', 
-                            alignItems: 'center', justifyContent: 'center' 
-                          }}>
+                          <span
+                            key={`${item.id}-${idx}`}
+                            title={`${item.title} (${item.committee})`}
+                            style={{
+                              width: '14px',
+                              height: '14px',
+                              borderRadius: '50%',
+                              backgroundColor: bgColor,
+                              color: 'white',
+                              fontSize: '8px',
+                              fontWeight: 'bold',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
                             {letter}
                           </span>
                         );
@@ -565,24 +406,25 @@ const Dashboard = () => {
           </div>
         </section>
 
+        {/* Görevlerim / Genel Akış Listesi */}
         <section className="dashboard-card dashboard-assigned-card">
           <div className="dashboard-card-header">
             <div className="dashboard-card-title-wrap">
               <ClipboardList size={18} />
-              <h3>Genel Akış</h3>
+              <h3>Bana Atanan Akış ({assignedTasks.length})</h3>
             </div>
           </div>
 
           <div className="dashboard-assigned-list">
             {assignedTasks.length === 0 ? (
               <div className="dashboard-empty-state">
-                Henüz bir görev veya akış kaydı bulunamadı.
+                Size atanmış bekleyen bir görev bulunmuyor.
               </div>
             ) : (
               assignedTasks.map((task) => (
-                <article 
-                  key={task.id} 
-                  className="dashboard-assigned-item" 
+                <article
+                  key={task.id}
+                  className="dashboard-assigned-item"
                   style={{ cursor: 'pointer' }}
                   onClick={() => setSelectedItem(task)}
                 >
@@ -605,6 +447,7 @@ const Dashboard = () => {
           </div>
         </section>
       </div>
+
       {/* Görev Detay Pop-up */}
       {selectedItem && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -616,7 +459,7 @@ const Dashboard = () => {
                   <ClipboardList size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0 }}>Görev Detayları</h2>
+                  <h2 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0 }}>{selectedItem.type === 'event' ? 'Etkinlik Detayı' : 'Görev Detayı'}</h2>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, textTransform: 'uppercase', fontWeight: '700' }}>{selectedItem.committee}</p>
                 </div>
               </div>

@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Search, Bell, HelpCircle, User, Menu, X, LogOut, Info, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { API_BASE_URL, getAuthHeaders } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import './Header.css';
 
 const Header = ({ toggleSidebar }) => {
-  const [user, setUser] = useState(null);
+  const { user, logout } = useAuth();
   const [rank, setRank] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -14,33 +16,31 @@ const Header = ({ toggleSidebar }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
 
-  const fetchUser = async () => {
-    const savedUser = localStorage.getItem('custom_user');
-    if (savedUser) {
-       const userObj = JSON.parse(savedUser);
-       setUser(userObj);
-       // Kullanıcı rütbesini/rolünü belirle (Önce rank kolonuna bak, yoksa role'a bak)
-       if (userObj.rank) {
-         setRank(userObj.rank);
-       } else if (userObj.role === 'admin') {
-         setRank('Yönetici');
-       } else if (userObj.role === 'editor') {
-         setRank('Moderatör');
-       } else {
-         setRank('Üye');
-       }
-       fetchNotifications(userObj.id);
+  useEffect(() => {
+    if (user) {
+      if (user.rank) {
+        setRank(user.rank);
+      } else if (user.role === 'admin') {
+        setRank('Yönetici');
+      } else if (user.role === 'editor') {
+        setRank('Moderatör');
+      } else {
+        setRank('Üye');
+      }
+      fetchNotifications(user.id);
     } else {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      if (session?.user) fetchNotifications(session.user.id);
+      setRank('');
+      setNotifications([]);
+      setUnreadCount(0);
     }
-  };
+  }, [user]);
 
   const fetchNotifications = async (userId) => {
     if (!userId) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/auth/notifications/${userId}`);
+      const response = await fetch(`${API_BASE_URL}/api/auth/notifications/${userId}`, {
+        headers: getAuthHeaders()
+      });
       if (!response.ok) throw new Error('Bildirimler alınamadı');
       const data = await response.json();
       setNotifications(data || []);
@@ -53,9 +53,9 @@ const Header = ({ toggleSidebar }) => {
   const markAsRead = async () => {
     if (!user?.id || unreadCount === 0) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/auth/notifications/${user.id}/mark-read`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/notifications/${user.id}/mark-read`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' })
       });
       if (!response.ok) throw new Error('Bildirimler güncellenemedi');
       setUnreadCount(0);
@@ -66,7 +66,6 @@ const Header = ({ toggleSidebar }) => {
   };
 
   useEffect(() => {
-    fetchUser();
     // Storage ve Özel Profil eventlerini dinle
     const handleOpenProfile = () => setShowProfileModal(true);
     const handleToggleNotifications = () => {
@@ -74,30 +73,41 @@ const Header = ({ toggleSidebar }) => {
       if (!showNotifications) markAsRead();
     };
 
-    window.addEventListener('storage', fetchUser);
     window.addEventListener('open-profile', handleOpenProfile);
     window.addEventListener('toggle-notifications', handleToggleNotifications);
 
-    // Bildirim polling (her 30 saniyede kontrol et)
+    // Supabase Realtime ile anlık bildirim dinle (0 saniye gecikme)
+    let notifChannel;
     let pollInterval;
+
     if (user?.id) {
+      notifChannel = supabase
+        .channel(`realtime-notif-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          () => {
+            fetchNotifications(user.id);
+          }
+        )
+        .subscribe();
+
+      // Ağ kesintisi gibi durumlar için sessiz arka plan fallback'i (60s)
       pollInterval = setInterval(() => {
         fetchNotifications(user.id);
-      }, 30000);
+      }, 60000);
     }
 
     return () => {
-      window.removeEventListener('storage', fetchUser);
       window.removeEventListener('open-profile', handleOpenProfile);
       window.removeEventListener('toggle-notifications', handleToggleNotifications);
+      if (notifChannel) supabase.removeChannel(notifChannel);
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [user?.id]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('custom_user');
-    window.dispatchEvent(new Event('storage'));
+    await logout();
     setShowProfileModal(false);
     navigate('/login');
   };

@@ -1,17 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import { 
   Calendar, Plus, Users, Trash2, Edit2, CheckCircle, Clock, X, 
   AlertCircle, Search, UserCheck, Link as LinkIcon, FileText, Upload 
 } from 'lucide-react';
+import { isManager } from '../lib/roles';
 
-const normalizeRank = (rank) => String(rank || '').toLocaleLowerCase('tr-TR').trim();
-const AUTHORIZED_RANKS = ['başkan', 'başkan yardımcısı', 'komite başkanı', 'developer'];
+const DEFAULT_COMMITTEE_COLUMNS = {
+  etkinlik: 'PLANLAMA',
+  proje: 'YAPILACAKLAR',
+  sosyal: 'PLANLANAN',
+  medium: 'TASLAK'
+};
 
 const MyTasks = () => {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
+  const { success, error: toastError, warning } = useToast();
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,15 +42,26 @@ const MyTasks = () => {
   });
   const [selectedFile, setSelectedFile] = useState(null);
 
-  const isAuthorized = user && AUTHORIZED_RANKS.includes(normalizeRank(user.rank));
+  const isAuthorized = isManager(user);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('custom_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
     fetchData();
-  }, []);
+
+    // Supabase Realtime ile tasks ve task_assignments tablolarını canlı dinle
+    const channel = supabase
+      .channel('realtime-my-tasks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignments' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const notifyDashboardRefresh = () => {
     window.dispatchEvent(new Event('dashboard-refresh'));
@@ -51,9 +70,7 @@ const MyTasks = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Get current user from localStorage or state
-      const savedUser = localStorage.getItem('custom_user');
-      const currentUser = savedUser ? JSON.parse(savedUser) : user;
+      const currentUser = user;
 
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
@@ -66,7 +83,8 @@ const MyTasks = () => {
             completed_at
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(150);
 
       if (tasksError) throw tasksError;
 
@@ -126,7 +144,7 @@ const MyTasks = () => {
       return data.publicUrl;
     } catch (error) {
       console.error('Büyük hata:', error.message);
-      alert('Dosya yüklenemedi: ' + error.message);
+      toastError('Dosya yüklenemedi: ' + error.message);
       return null;
     } finally {
       setUploading(false);
@@ -136,7 +154,7 @@ const MyTasks = () => {
   const handleCreateOrUpdateTask = async (e) => {
     e.preventDefault();
     if (!formData.title || formData.assignedUsers.length === 0) {
-      alert('Lütfen başlık girin ve en az bir kişi atayın.');
+      warning('Lütfen başlık girin ve en az bir kişi atayın.');
       return;
     }
 
@@ -152,13 +170,16 @@ const MyTasks = () => {
         }
       }
 
+      const defaultCol = formData.committee ? (DEFAULT_COMMITTEE_COLUMNS[formData.committee] || 'PLANLAMA') : 'PLANLAMA';
       const taskPayload = {
         title: formData.title,
         description: formData.description,
         link_url: formData.link_url,
         attachment_url: currentAttachmentUrl,
-        committee: formData.committee,
-        updated_at: new Date()
+        committee: formData.committee || 'genel',
+        column_id: defaultCol,
+        status: 'pending',
+        updated_at: new Date().toISOString()
       };
 
       if (isEditing) {
@@ -209,9 +230,10 @@ const MyTasks = () => {
       resetForm();
       await fetchData();
       notifyDashboardRefresh();
+      success(isEditing ? 'Görev güncellendi.' : 'Görev başarıyla oluşturuldu.');
     } catch (err) {
       console.error('İşlem hatası:', err);
-      alert('Bir hata oluştu.');
+      toastError('Bir hata oluştu.');
     }
   };
 
@@ -222,8 +244,10 @@ const MyTasks = () => {
       if (error) throw error;
       await fetchData();
       notifyDashboardRefresh();
+      success('Görev silindi.');
     } catch (err) {
       console.error('Silme hatası:', err);
+      toastError('Görev silinirken bir hata oluştu.');
     }
   };
 
@@ -606,7 +630,7 @@ const TaskCard = ({ task, isCreator, currentUser, onDelete, onEdit, onToggle }) 
 
 // Helper functions
 const isAuthorizedRank = (user) => {
-  return user && AUTHORIZED_RANKS.includes(normalizeRank(user.rank));
+  return isManager(user);
 };
 
 const isImage = (url) => {
