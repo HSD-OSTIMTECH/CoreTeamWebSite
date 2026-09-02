@@ -1,12 +1,16 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, CheckSquare, FileText, Cpu, Calendar, Settings, LogOut, Plus, X, Bell, User, LifeBuoy, Megaphone } from 'lucide-react';
+import { 
+  LayoutDashboard, CheckSquare, FileText, Cpu, Calendar, 
+  LogOut, X, User, LifeBuoy, Megaphone, 
+  PanelLeftClose, PanelLeftOpen 
+} from 'lucide-react';
 import './Sidebar.css';
 
-const Sidebar = ({ isOpen, toggleSidebar }) => {
+const Sidebar = ({ isOpen, toggleSidebar, isCollapsed = false, toggleCollapse }) => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -14,17 +18,31 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   };
 
   return (
-    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-logo">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+        <div className="sidebar-logo-content">
           <div className="logo-icon">
             <img src="/icons/huawei-hsd-logo-transparent.png" alt="HSD" className="sidebar-logo-img" />
           </div>
-          <div>
-            <div className="logo-text">HSD OSTIMTECH</div>
-            <div className="logo-subtext">CoreTeam Management</div>
-          </div>
+          {!isCollapsed && (
+            <div className="logo-text-wrap">
+              <div className="logo-text">HSD OSTIMTECH</div>
+              <div className="logo-subtext">CoreTeam Management</div>
+            </div>
+          )}
         </div>
+
+        {/* Masaüstü Menü Daraltma / Genişletme Butonu */}
+        <button 
+          className="collapse-btn" 
+          onClick={toggleCollapse} 
+          title={isCollapsed ? "Menüyü Genişlet" : "Menüyü Daralt"}
+          aria-label={isCollapsed ? "Genişlet" : "Daralt"}
+        >
+          {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
+
+        {/* Mobil Kapatma Butonu */}
         <button className="menu-close" onClick={toggleSidebar}>
           <X size={20} />
         </button>
@@ -32,38 +50,81 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
       <nav className="sidebar-nav">
         <div className="nav-section">
-          <div className="nav-section-title">MENÜ</div>
-          <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={() => window.innerWidth < 1024 && toggleSidebar()}>
+          {!isCollapsed && <div className="nav-section-title">MENÜ</div>}
+          
+          <NavLink 
+            to="/dashboard" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Genel Bakış"
+            title={isCollapsed ? "Genel Bakış" : undefined}
+          >
             <LayoutDashboard size={20} />
             <span>Genel Bakış</span>
           </NavLink>
           
-          <NavLink to="/announcements" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={() => window.innerWidth < 1024 && toggleSidebar()}>
+          <NavLink 
+            to="/announcements" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Duyurular"
+            title={isCollapsed ? "Duyurular" : undefined}
+          >
             <Megaphone size={20} />
             <span>Duyurular</span>
           </NavLink>
 
-          <NavLink to="/tasks" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={() => window.innerWidth < 1024 && toggleSidebar()}>
+          <NavLink 
+            to="/tasks" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Görevlerim"
+            title={isCollapsed ? "Görevlerim" : undefined}
+          >
             <CheckSquare size={20} />
             <span>Görevlerim</span>
           </NavLink>
           
-          <NavLink to="/events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={() => window.innerWidth < 1024 && toggleSidebar()}>
+          <NavLink 
+            to="/events" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Etkinlik & Sponsorluk"
+            title={isCollapsed ? "Etkinlik & Sponsorluk" : undefined}
+          >
             <Calendar size={20} />
             <span>Etkinlik & Sponsorluk</span>
           </NavLink>
           
-          <NavLink to="/social-media" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={() => window.innerWidth < 1024 && toggleSidebar()}>
+          <NavLink 
+            to="/social-media" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Sosyal Medya"
+            title={isCollapsed ? "Sosyal Medya" : undefined}
+          >
             <Cpu size={20} />
             <span>Sosyal Medya</span>
           </NavLink>
           
-          <NavLink to="/medium" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={() => window.innerWidth < 1024 && toggleSidebar()}>
+          <NavLink 
+            to="/medium" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Medium"
+            title={isCollapsed ? "Medium" : undefined}
+          >
             <FileText size={20} />
             <span>Medium</span>
           </NavLink>
           
-          <NavLink to="/projects" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={() => window.innerWidth < 1024 && toggleSidebar()}>
+          <NavLink 
+            to="/projects" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Teknoloji & Proje"
+            title={isCollapsed ? "Teknoloji & Proje" : undefined}
+          >
             <CheckSquare size={20} />
             <span>Teknoloji & Proje</span>
           </NavLink>
@@ -90,17 +151,29 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         </div>
 
         <div className="nav-section" style={{ marginTop: 'auto' }}>
-          <NavLink to="/support" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={() => window.innerWidth < 1024 && toggleSidebar()}>
+          <NavLink 
+            to="/support" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Destek"
+            title={isCollapsed ? "Destek" : undefined}
+          >
             <LifeBuoy size={20} />
             <span>Destek</span>
           </NavLink>
-          <div className="nav-item logout" onClick={handleLogout}>
+          
+          <div 
+            className="nav-item logout" 
+            onClick={handleLogout}
+            data-title="Çıkış Yap"
+            title={isCollapsed ? "Çıkış Yap" : undefined}
+          >
             <LogOut size={20} />
             <span>Çıkış Yap</span>
           </div>
         </div>
       </nav>
-    </div>
+    </aside>
   );
 };
 
