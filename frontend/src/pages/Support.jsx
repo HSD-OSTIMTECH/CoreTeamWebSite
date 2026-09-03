@@ -69,7 +69,7 @@ const Support = () => {
             </div>
             <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontWeight: '700', fontSize: '0.9rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <span>Yiğit Arda Kıdıman</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: '500' }}>kidimanyigit@gmail.com</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: '500' }}>yigitardakidiman@gmail.com</span>
             </div>
             <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontWeight: '700', fontSize: '0.9rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <span>Yusuf Tuna Göker</span>
