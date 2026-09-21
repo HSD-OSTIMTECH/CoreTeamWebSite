@@ -283,7 +283,7 @@ const UserManagement = () => {
               <label className="form-label">Ad Soyad *</label>
               <input 
                 type="text" 
-                placeholder="Örn: Yiğit Arda Kıdıman" 
+                placeholder="Örn: Ahmet Yılmaz" 
                 className="form-input"
                 value={formData.full_name}
                 onChange={handleNameChange}
@@ -295,7 +295,7 @@ const UserManagement = () => {
               <label className="form-label">Kullanıcı Adı (Giriş için) *</label>
               <input 
                 type="text" 
-                placeholder="Örn: yigitarda" 
+                placeholder="Örn: ahmetyilmaz" 
                 className="form-input"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -308,7 +308,7 @@ const UserManagement = () => {
               <div className="input-with-action">
                 <input 
                   type="text" 
-                  placeholder="En az 6 karakter" 
+                  placeholder="En az 6 karakterli bir şifre girin" 
                   className="form-input"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
