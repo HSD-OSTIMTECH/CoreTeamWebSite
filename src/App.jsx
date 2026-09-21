@@ -10,8 +10,9 @@ import Support from './pages/Support';
 import Events from './pages/Events';
 import Login from './pages/Login';
 import Announcements from './pages/Announcements';
+import UserManagement from './pages/UserManagement';
 import { useAuth } from './context/AuthContext';
-import { canManageCommittee } from './lib/roles';
+import { canManageCommittee, canManageUsers } from './lib/roles';
 
 function App() {
   const { user, session, loading } = useAuth();
@@ -52,6 +53,11 @@ function App() {
 
         <Route path="tasks" element={<MyTasks />} />
         <Route path="announcements" element={<Announcements />} />
+        <Route 
+          path="users" 
+          element={canManageUsers(user) ? <UserManagement /> : <Navigate to="/dashboard" replace />} 
+        />
+        <Route path="register" element={<Navigate to="/users" replace />} />
         <Route path="support" element={<Support />} />
         <Route path="reports" element={<div className="page-container"><h2>Raporlar (Yapım Aşamasında)</h2></div>} />
         <Route path="settings" element={<div className="page-container"><h2>Ayarlar (Yapım Aşamasında)</h2></div>} />

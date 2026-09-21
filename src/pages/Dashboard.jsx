@@ -6,6 +6,7 @@ import {
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { getDateConstraints } from '../lib/dateConstraints';
+import { sanitizeUrl } from '../lib/security';
 import './Dashboard.css';
 
 const DAY_LABELS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
@@ -248,7 +249,7 @@ const Dashboard = () => {
     year: 'numeric'
   });
 
-  const welcomeName = formatDisplayName(user?.username || user?.email || '') || 'Kullanıcı';
+  const welcomeName = user?.full_name || formatDisplayName(user?.username || user?.email || '') || 'Kullanıcı';
 
   return (
     <div className="page-container">
@@ -491,20 +492,25 @@ const Dashboard = () => {
                 </div>
               )}
 
-              {(selectedItem.link_url || selectedItem.attachment_url) && (
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                  {selectedItem.link_url && (
-                    <a href={selectedItem.link_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'var(--primary-color)', fontSize: '0.8rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <LinkIcon size={14} /> Bağlantıya Git
-                    </a>
-                  )}
-                  {selectedItem.attachment_url && (
-                    <a href={selectedItem.attachment_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'var(--primary-color)', fontSize: '0.8rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <FileText size={14} /> Dosyayı Görüntüle
-                    </a>
-                  )}
-                </div>
-              )}
+              {(() => {
+                const safeLink = sanitizeUrl(selectedItem.link_url);
+                const safeAttachment = sanitizeUrl(selectedItem.attachment_url);
+                if (!safeLink && !safeAttachment) return null;
+                return (
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                    {safeLink && (
+                      <a href={safeLink} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'var(--primary-color)', fontSize: '0.8rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <LinkIcon size={14} /> Bağlantıya Git
+                      </a>
+                    )}
+                    {safeAttachment && (
+                      <a href={safeAttachment} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'var(--primary-color)', fontSize: '0.8rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <FileText size={14} /> Dosyayı Görüntüle
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <button onClick={() => setSelectedItem(null)} style={{ width: '100%', marginTop: '2rem', padding: '0.8rem', borderRadius: '12px', border: 'none', backgroundColor: 'var(--primary-color)', color: 'white', fontWeight: '700', cursor: 'pointer' }}>Kapat</button>

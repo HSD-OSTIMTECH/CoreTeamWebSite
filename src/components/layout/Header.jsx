@@ -192,9 +192,18 @@ const Header = ({ toggleSidebar }) => {
                     onClick={async (e) => {
                       e.stopPropagation();
                       if (window.confirm('Tüm bildirimler silinecek. Emin misiniz?')) {
-                        await supabase.from('notifications').delete().eq('user_id', user.id);
-                        setNotifications([]);
-                        setUnreadCount(0);
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/api/tasks/notifications/clear`, {
+                            method: 'DELETE',
+                            headers: getAuthHeaders()
+                          });
+                          if (res.ok) {
+                            setNotifications([]);
+                            setUnreadCount(0);
+                          }
+                        } catch (err) {
+                          console.error('Bildirim temizleme hatası:', err);
+                        }
                       }
                     }}
                     style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.7rem', fontWeight: '600', cursor: 'pointer' }}
@@ -235,7 +244,9 @@ const Header = ({ toggleSidebar }) => {
         <div className="user-profile" onClick={() => setShowProfileModal(true)} title={user?.username || user?.email || 'Kullanıcı'}>
           <div className="avatar" style={{ border: '2px solid var(--primary-color)', cursor: 'pointer' }}>
             {user ? (
-              <img src={`https://ui-avatars.com/api/?name=${user.username || user.email}&background=0D8ABC&color=fff`} alt="User Avatar" />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary-color)', color: '#fff', fontWeight: '700', fontSize: '0.8rem', width: '32px', height: '32px', borderRadius: '50%' }}>
+                {(user.username || user.email || 'U').charAt(0).toUpperCase()}
+              </div>
             ) : (
               <div style={{ backgroundColor: 'var(--border-color)', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <User size={18} color="var(--text-muted)" />
@@ -258,10 +269,13 @@ const Header = ({ toggleSidebar }) => {
             </button>
 
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ width: '100px', height: '100px', borderRadius: '50%', margin: '0 auto 1.5rem', border: '4px solid var(--primary-bg)', overflow: 'hidden' }}>
-                <img src={`https://ui-avatars.com/api/?name=${user?.username || user?.email}&background=0D8ABC&color=fff&size=200`} style={{ width: '100%', height: '100%' }} alt="Profile" />
+              <div style={{ width: '100px', height: '100px', borderRadius: '50%', margin: '0 auto 1.5rem', border: '4px solid var(--primary-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary-color)', color: '#fff', fontWeight: '800', fontSize: '2.5rem' }}>
+                {(user?.full_name || user?.username || 'U').charAt(0).toUpperCase()}
               </div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.25rem' }}>{user?.username || 'Kullanıcı'}</h2>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.25rem' }}>{user?.full_name || user?.username || 'Kullanıcı'}</h2>
+              {user?.full_name && user?.username && (
+                <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>@{user.username}</div>
+              )}
               <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--primary-color)', backgroundColor: 'var(--primary-bg)', padding: '0.35rem 1rem', borderRadius: '1rem', textTransform: 'uppercase' }}>
                 {user?.rank || 'Üye'}
               </span>

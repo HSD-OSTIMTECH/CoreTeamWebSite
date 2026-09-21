@@ -59,21 +59,13 @@ const Support = () => {
 
           <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '12px' }}>Destek Birimi</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '1rem', lineHeight: '1.6', marginBottom: '32px' }}>
-            Lütfen destek talepleriniz veya sorularınız için aşağıdaki geliştiricilerimizle iletişime geçin:
+            Lütfen destek talepleriniz veya sorularınız için geliştiricimizle iletişime geçin:
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '40px' }}>
             <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontWeight: '700', fontSize: '0.9rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <span>Yusuf Türker Albayrak</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: '500' }}>turkeralb@gmail.com</span>
-            </div>
-            <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontWeight: '700', fontSize: '0.9rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <span>Yiğit Arda Kıdıman</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: '500' }}>yigitardakidiman@gmail.com</span>
-            </div>
-            <div style={{ padding: '16px', borderRadius: '16px', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontWeight: '700', fontSize: '0.9rem', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <span>Yusuf Tuna Göker</span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: '500' }}>yusuftgoker@gmail.com</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--primary-color)', fontWeight: '500' }}>yigitardakidiman@gmail.com</span>
             </div>
           </div>
 

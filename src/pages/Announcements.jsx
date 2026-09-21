@@ -152,22 +152,30 @@ const Announcements = () => {
 
   return (
     <div className="page-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem' }}>Duyurular</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Önemli güncellemeler ve duyuruları buradan takip edebilirsiniz.</p>
+          <h1 className="page-title" style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--text-main)', margin: '0 0 0.35rem 0' }}>Duyurular</h1>
+          <p className="page-subtitle" style={{ fontSize: '0.95rem', color: 'var(--text-muted)', margin: 0 }}>Önemli güncellemeler ve duyuruları buradan takip edebilirsiniz.</p>
         </div>
         
         {canCreate && (
           <button 
             onClick={() => setShowModal(true)}
+            className="btn btn-primary"
             style={{ 
-              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.8rem 1.5rem', 
-              borderRadius: '12px', border: 'none', backgroundColor: 'var(--primary-color)', 
-              color: 'white', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(15, 118, 110, 0.2)'
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '0.5rem', 
+              padding: '0.7rem 1.35rem', 
+              borderRadius: '12px', 
+              fontSize: '0.9rem', 
+              fontWeight: '700', 
+              cursor: 'pointer', 
+              boxShadow: '0 4px 6px -1px rgba(15, 118, 110, 0.2)',
+              border: 'none'
             }}
           >
-            <Plus size={20} /> Duyuru Paylaş
+            <Plus size={18} /> Duyuru Paylaş
           </button>
         )}
       </div>

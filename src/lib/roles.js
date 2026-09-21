@@ -10,11 +10,29 @@ export const MANAGEMENT_RANKS = [
   'baskan yardimcisi',
   'komite başkanı',
   'komite baskani',
-  'yönetici',
-  'yonetici',
   'developer',
   'admin'
 ];
+
+export const ADMIN_RANKS = [
+  'başkan',
+  'baskan',
+  'başkan yardımcısı',
+  'baskan yardimcisi',
+  'developer',
+  'admin'
+];
+
+/**
+ * Checks if a user has authority to manage and register users.
+ * @param {Object} user
+ * @returns {boolean}
+ */
+export const canManageUsers = (user) => {
+  if (!user) return false;
+  const rank = normalizeRank(user.rank);
+  return ADMIN_RANKS.includes(rank);
+};
 
 /**
  * Normalizes a rank string for safe comparisons (Turkish locale aware).

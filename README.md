@@ -25,61 +25,39 @@ CoreTeam, modern ve kullanıcı dostu bir arayüze sahip, kulüp ve topluluk yö
 Projeyi yerel makinenizde çalıştırmak için aşağıdaki adımları izleyin.
 
 ### 1. Ön Gereksinimler
-- Node.js (v16 veya üstü)
+- Node.js (v18 veya üstü)
 - npm veya yarn
 - Supabase hesabı ve projesi
 
-### 2. Supabase Yapılandırması
+### 2. Ortam Değişkenleri (.env)
 
-1. [Supabase Dashboard](https://app.supabase.com) → Projeniz → **Settings** → **API**
-2. Aşağıdaki bilgileri not edin:
-   - **Project URL** → `VITE_SUPABASE_URL` / `SUPABASE_URL`
-   - **Anon Public Key** → `VITE_SUPABASE_KEY` (⚠️ Secret Key değil!)
-   - **Service Role Key** → `SUPABASE_KEY` (yalnızca backend için)
+Proje kök dizinindeki `.env.example` dosyasını `.env` olarak kopyalayın ve Supabase bilgilerinizi girin:
 
-### 3. Backend Kurulumu
+```env
+# Supabase Yapılandırması
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_KEY=your-anon-public-key-here
 
-1. `backend` dizinine gidin:
-   ```bash
-   cd backend
-   ```
-2. Gerekli paketleri yükleyin:
-   ```bash
-   npm install
-   ```
-3. `.env` dosyasını oluşturun:
-   ```env
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_KEY=your-service-role-key-here
-   JWT_SECRET=your-secret-key-change-in-production
-   PORT=5000
-   ```
-4. Sunucuyu başlatın:
-   ```bash
-   npm run dev
-   ```
-   *Sunucu `http://localhost:5000` adresinde çalışacaktır.*
+# Backend / Serverless Kimlik Doğrulama
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-anon-or-service-role-key-here
+JWT_SECRET=your-jwt-secret-key-change-in-production
 
-### 4. Frontend Kurulumu
+# API URL (Vercel ve yerel Vite geliştirmesinde aynı origin için boş bırakın)
+VITE_API_URL=
+```
 
-1. `frontend` dizinine gidin:
-   ```bash
-   cd frontend
-   ```
-2. Gerekli paketleri yükleyin:
-   ```bash
-   npm install
-   ```
-3. `.env.local` dosyasını oluşturun:
-   ```env
-   VITE_SUPABASE_URL=https://your-project.supabase.co
-   VITE_SUPABASE_KEY=your-anon-public-key-here
-   ```
-4. Uygulamayı geliştirme modunda başlatın:
-   ```bash
-   npm run dev
-   ```
-   *Uygulama `http://localhost:5173` adresinde çalışacaktır.*
+### 3. Bağımlılıkları Yükleyin ve Başlatın
+
+```bash
+# Bağımlılıkları yükleyin
+npm install
+
+# Geliştirme sunucusunu başlatın
+npm run dev
+```
+
+*Uygulama ve entegre API `http://localhost:3000` adresinde tek bir port üzerinden çalışacaktır.*
 
 ---
 
@@ -87,29 +65,40 @@ Projeyi yerel makinenizde çalıştırmak için aşağıdaki adımları izleyin.
 
 ```text
 CoreTeamWebSite/
-├── backend/
-│   ├── routes/
-│   │   └── auth.js          # Kimlik doğrulama ve API endpoints
-│   ├── server.js            # Ana sunucu dosyası
-│   ├── package.json         # Backend bağımlılıkları
-│   └── .env                 # Çevre değişkenleri
-├── frontend/
-│   ├── src/
-│   │   ├── components/      # Tekrar kullanılabilir UI bileşenleri
-│   │   │   ├── common/      # Card, Badge gibi temel bileşenler
-│   │   │   └── layout/      # Header, Sidebar, MainLayout
-│   │   ├── pages/           # Dashboard sayfaları
-│   │   ├── lib/             # Supabase client
-│   │   ├── App.jsx          # Ana uygulama bileşeni
-│   │   ├── main.jsx         # Entry point
-│   │   └── index.css        # Global stiller
-│   ├── index.html           # HTML template
-│   ├── vite.config.js       # Vite konfigürasyonu
-│   ├── package.json         # Frontend bağımlılıkları
-│   └── .env.local           # Çevre değişkenleri (⚠️ .gitignore'a ekle)
-├── README.md
-└── vercel.json              # Vercel deployment konfigürasyonu
+├── api/                     # Vercel Serverless API Fonksiyonları
+│   ├── index.js             # API Express handler & Serverless giriş noktası
+│   └── routes/
+│       ├── auth.js          # Giriş, kullanıcılar, duyuru & bildirim rotaları
+│       └── authMiddleware.js# Token doğrulama middleware
+├── public/                  # Statik varlıklar (logolar, ikonlar)
+├── src/                     # React arayüz kaynak kodları
+│   ├── components/          # UI bileşenleri (ortak, komite panosu, layout)
+│   ├── context/             # AuthContext ve oturum yönetimi
+│   ├── lib/                 # supabaseClient.js, api.js
+│   ├── pages/               # Dashboard, Görevler, Duyurular, Giriş sayfaları
+│   ├── App.jsx              # Rotalar ve ana uygulama
+│   ├── main.jsx             # React DOM başlangıç noktası
+│   └── index.css            # Tema ve genel CSS kuralları
+├── index.html               # Vite HTML şablonu
+├── vite.config.js           # Vite ve dev API middleware konfigürasyonu
+├── package.json             # Birleşik bağımlılıklar ve scriptler
+├── vercel.json              # Vercel Serverless ve SPA yönlendirmeleri
+└── .env.example             # Ortam değişkeni şablonu
 ```
+
+---
+
+## 🚀 Vercel Dağıtımı (Deployment)
+
+1. Projeyi GitHub / GitLab deponuza push edin.
+2. Vercel Dashboard'unda **Add New Project** diyerek deponuzu bağlayın.
+3. **Environment Variables** bölümüne `.env` içerisindeki değişkenleri ekleyin:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_KEY`
+   - `SUPABASE_URL`
+   - `SUPABASE_KEY`
+   - `JWT_SECRET`
+4. **Deploy** butonuna tıklayın. Vercel hem Vite SPA frontend'ini hem de `/api` Serverless fonksiyonlarını otomatik olarak kuracaktır.
 
 ---
 

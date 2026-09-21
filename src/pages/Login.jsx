@@ -283,20 +283,12 @@ function Login() {
             </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '12px' }}>Şifre İşlemleri</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '24px' }}>
-              Lütfen şifre sıfırlama işlemleri için geliştirici ekibiyle iletişime geçin:
+              Lütfen şifre sıfırlama işlemleri için geliştiricimizle iletişime geçin:
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
               <div style={{ padding: '12px', borderRadius: '12px', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span>Yusuf Türker Albayrak</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: '500' }}>turkeralb@gmail.com</span>
-              </div>
-              <div style={{ padding: '12px', borderRadius: '12px', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span>Yiğit Arda Kıdıman</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: '500' }}>kidimanyigit@gmail.com</span>
-              </div>
-              <div style={{ padding: '12px', borderRadius: '12px', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontWeight: '600', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span>Yusuf Tuna Göker</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', fontWeight: '500' }}>yusuftgoker@gmail.com</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: '500' }}>yigitardakidiman@gmail.com</span>
               </div>
             </div>
             <button 

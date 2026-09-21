@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MoreHorizontal, Edit2, Trash2, Clock, Link as LinkIcon, FileText } from 'lucide-react';
+import { sanitizeUrl } from '../../lib/security';
 
 const KanbanCard = ({
   id,
@@ -16,7 +17,9 @@ const KanbanCard = ({
   onDragStart,
   onDelete,
   onEdit,
-  canEdit = true
+  canEdit = true,
+  canDelete = true,
+  editLabel
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -121,34 +124,36 @@ const KanbanCard = ({
                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-color)')}
                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
-                    <Edit2 size={14} /> {itemLabel} Düzenle
+                    <Edit2 size={14} /> {editLabel || `${itemLabel} Düzenle`}
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      onDelete && onDelete(id);
-                    }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '0.6rem 0.85rem',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--danger)',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      borderTop: '1px solid var(--border-color)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'var(--danger-bg)')}
-                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <Trash2 size={14} /> {itemLabel} Sil
-                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMenu(false);
+                        onDelete && onDelete(id);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '0.6rem 0.85rem',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--danger)',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        borderTop: '1px solid var(--border-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-color)')}
+                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <Trash2 size={14} /> {itemLabel} Sil
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -179,32 +184,37 @@ const KanbanCard = ({
       )}
 
       {/* Links & Attachments Badges (If any) */}
-      {(link_url || attachment_url) && (
-        <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          {link_url && (
-            <a
-              href={link_url}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem', color: 'var(--primary-color)', fontWeight: '600' }}
-            >
-              <LinkIcon size={12} /> Link
-            </a>
-          )}
-          {attachment_url && (
-            <a
-              href={attachment_url}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem', color: 'var(--primary-color)', fontWeight: '600' }}
-            >
-              <FileText size={12} /> Ek Dosya
-            </a>
-          )}
-        </div>
-      )}
+      {(() => {
+        const safeLink = sanitizeUrl(link_url);
+        const safeAttachment = sanitizeUrl(attachment_url);
+        if (!safeLink && !safeAttachment) return null;
+        return (
+          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            {safeLink && (
+              <a
+                href={safeLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem', color: 'var(--primary-color)', fontWeight: '600' }}
+              >
+                <LinkIcon size={12} /> Link
+              </a>
+            )}
+            {safeAttachment && (
+              <a
+                href={safeAttachment}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem', color: 'var(--primary-color)', fontWeight: '600' }}
+              >
+                <FileText size={12} /> Ek Dosya
+              </a>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Footer: Avatars & Meta */}
       <div className="flex justify-between items-center mt-auto" style={{ paddingTop: '0.5rem' }}>
@@ -224,11 +234,9 @@ const KanbanCard = ({
               }}
               title={name}
             >
-              <img
-                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`}
-                alt={name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary-color)', color: '#fff', fontWeight: '700', fontSize: '0.6rem', width: '100%', height: '100%', borderRadius: '50%' }}>
+                {(name || 'U').charAt(0).toUpperCase()}
+              </div>
             </div>
           ))}
           {avatars.length > 4 && (

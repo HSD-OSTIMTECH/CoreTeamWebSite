@@ -1,16 +1,17 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { canManageUsers } from '../../lib/roles';
 import { 
   LayoutDashboard, CheckSquare, FileText, Cpu, Calendar, 
-  LogOut, X, User, LifeBuoy, Megaphone, 
+  LogOut, X, User, LifeBuoy, Megaphone, UserPlus, Users,
   PanelLeftClose, PanelLeftOpen 
 } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, toggleSidebar, isCollapsed = false, toggleCollapse }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -130,17 +131,31 @@ const Sidebar = ({ isOpen, toggleSidebar, isCollapsed = false, toggleCollapse })
           </NavLink>
         </div>
 
-        {/* Mobil Özel Bölüm */}
-        <div className="nav-section show-mobile-only">
-          <div className="nav-section-title">KULLANICI İŞLEMLERİ</div>
-          <div className="nav-item" onClick={() => {
+        {/* Kullanıcı İşlemleri Bölümü */}
+        <div className={`nav-section ${canManageUsers(user) ? '' : 'show-mobile-only'}`}>
+          {!isCollapsed && <div className="nav-section-title">KULLANICI İŞLEMLERİ</div>}
+          
+          {canManageUsers(user) && (
+            <NavLink 
+              to="/users" 
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+              onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+              data-title="Kullanıcı Ekle"
+              title={isCollapsed ? "Kullanıcı Ekle" : undefined}
+            >
+              <UserPlus size={20} />
+              <span>Kullanıcı Ekle</span>
+            </NavLink>
+          )}
+
+          <div className="nav-item show-mobile-only" onClick={() => {
             window.dispatchEvent(new Event('open-profile'));
             toggleSidebar();
           }}>
             <User size={20} />
             <span>Profilim</span>
           </div>
-          <div className="nav-item" onClick={() => {
+          <div className="nav-item show-mobile-only" onClick={() => {
             const isDark = document.body.classList.toggle('dark-mode');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
             window.dispatchEvent(new Event('storage'));
