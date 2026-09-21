@@ -6,6 +6,7 @@ dist/
 dist-ssr/
 build/
 frontend/dist/
+.vite/
 
 # Environment variables (CRITICAL: Never commit these to public or internal repositories!)
 .env
