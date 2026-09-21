@@ -85,6 +85,11 @@ const Sidebar = ({ isOpen, toggleSidebar, isCollapsed = false, toggleCollapse })
             <CheckSquare size={20} />
             <span>Görevlerim</span>
           </NavLink>
+        </div>
+
+        {/* Komiteler Bölümü */}
+        <div className="nav-section">
+          {!isCollapsed && <div className="nav-section-title">KOMİTELER</div>}
           
           <NavLink 
             to="/events" 

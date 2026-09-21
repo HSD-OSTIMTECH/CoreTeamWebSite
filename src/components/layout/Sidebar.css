@@ -153,17 +153,17 @@ body:not(.dark-mode) .sidebar-logo-img {
 }
 
 .nav-section {
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.35rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .nav-section-title {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--text-muted);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   padding-left: 0.75rem;
   letter-spacing: 0.05em;
   white-space: nowrap;
