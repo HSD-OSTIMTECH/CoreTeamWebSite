@@ -49,3 +49,7 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Internal documentation and setup scripts
+docs/
+
