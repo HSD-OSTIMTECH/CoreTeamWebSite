@@ -379,10 +379,10 @@ const MyTasks = () => {
                       style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', outline: 'none', cursor: 'pointer' }}
                     >
                       <option value="">Genel (Hiçbiri)</option>
+                      <option value="proje">Teknoloji ve Proje</option>
                       <option value="etkinlik">Etkinlik ve Sponsorluk</option>
                       <option value="sosyal">Sosyal Medya</option>
                       <option value="medium">Medium</option>
-                      <option value="proje">Teknoloji ve Proje</option>
                     </select>
                   </div>
 

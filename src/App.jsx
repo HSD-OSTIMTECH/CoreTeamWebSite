@@ -35,6 +35,10 @@ function App() {
         
         {/* Komite Sayfaları - Görüntüleme Herkese Açık, Düzenleme Yetkiye Bağlı */}
         <Route 
+          path="projects" 
+          element={<Projects canEdit={canManageCommittee(user, 'proje')} />} 
+        />
+        <Route 
           path="events" 
           element={<Events canEdit={canManageCommittee(user, 'etkinlik')} />} 
         />
@@ -45,10 +49,6 @@ function App() {
         <Route 
           path="medium" 
           element={<MediumPanel canEdit={canManageCommittee(user, 'medium')} />} 
-        />
-        <Route 
-          path="projects" 
-          element={<Projects canEdit={canManageCommittee(user, 'proje')} />} 
         />
 
         <Route path="tasks" element={<MyTasks />} />

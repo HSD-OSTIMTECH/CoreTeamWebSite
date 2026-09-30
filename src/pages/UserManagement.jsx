@@ -11,9 +11,9 @@ import { canManageUsers, normalizeRank } from '../lib/roles';
 import './UserManagement.css';
 
 const AVAILABLE_ROLES = [
-  { id: 'sosyal', label: '📱 Sosyal Medya' },
   { id: 'proje', label: '💻 Proje & Teknik' },
   { id: 'etkinlik', label: '🎪 Etkinlik & Org.' },
+  { id: 'sosyal', label: '📱 Sosyal Medya' },
   { id: 'medium', label: '✍️ Medium & Blog' }
 ];
 

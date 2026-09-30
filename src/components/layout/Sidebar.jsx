@@ -92,6 +92,17 @@ const Sidebar = ({ isOpen, toggleSidebar, isCollapsed = false, toggleCollapse })
           {!isCollapsed && <div className="nav-section-title">KOMİTELER</div>}
           
           <NavLink 
+            to="/projects" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
+            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
+            data-title="Teknoloji & Proje"
+            title={isCollapsed ? "Teknoloji & Proje" : undefined}
+          >
+            <CheckSquare size={20} />
+            <span>Teknoloji & Proje</span>
+          </NavLink>
+
+          <NavLink 
             to="/events" 
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
             onClick={() => window.innerWidth < 1024 && toggleSidebar()}
@@ -122,17 +133,6 @@ const Sidebar = ({ isOpen, toggleSidebar, isCollapsed = false, toggleCollapse })
           >
             <FileText size={20} />
             <span>Medium</span>
-          </NavLink>
-          
-          <NavLink 
-            to="/projects" 
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} 
-            onClick={() => window.innerWidth < 1024 && toggleSidebar()}
-            data-title="Teknoloji & Proje"
-            title={isCollapsed ? "Teknoloji & Proje" : undefined}
-          >
-            <CheckSquare size={20} />
-            <span>Teknoloji & Proje</span>
           </NavLink>
         </div>
 
