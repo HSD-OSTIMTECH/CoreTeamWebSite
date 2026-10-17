@@ -42,3 +42,15 @@ export const apiFetch = (endpoint, options = {}) => {
   });
 };
 
+export const parseJsonResponse = async (response) => {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return await response.json();
+  }
+  const text = await response.text();
+  throw new Error(
+    !response.ok
+      ? `Sunucu hatası (${response.status}): Vercel ayarlarını veya sunucu loglarını kontrol edin.`
+      : 'Sunucudan beklenmeyen yanıt formatı alındı.'
+  );
+};

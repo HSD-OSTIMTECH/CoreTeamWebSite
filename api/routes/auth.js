@@ -18,15 +18,26 @@ dotenv.config();
 
 const router = express.Router();
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('CRITICAL: SUPABASE_URL ve SUPABASE_KEY (service role) ortam değişkenleri zorunludur.');
-  throw new Error('Backend başlatılamıyor: SUPABASE_URL veya SUPABASE_KEY eksik.');
+  console.error('CRITICAL: SUPABASE_URL ve SUPABASE_KEY ortam değişkenleri tanımlanmamış!');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = (supabaseUrl && supabaseKey)
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
+
+// Supabase yapılandırma kontrol middleware'i
+router.use((req, res, next) => {
+  if (!supabase) {
+    return res.status(500).json({
+      error: 'Sunucu yapılandırma hatası: Vercel üzerinde SUPABASE_URL ve SUPABASE_KEY ortam değişkenleri tanımlanmamış. Lütfen Vercel Dashboard > Settings > Environment Variables bölümüne değişkenleri ekleyip yeniden dağıtın (redeploy).'
+    });
+  }
+  next();
+});
 
 // Parse incoming Bearer tokens if present (non-breaking)
 router.use(verifyTokenOptional);

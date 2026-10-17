@@ -40,7 +40,7 @@ const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024 } // 15MB
 });
 
-// CORS Whitelist Configuration — Wildcard düzeltildi (Bulgu #4)
+// CORS Whitelist Configuration
 const envOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(o => o.trim().replace(/\/$/, ''))
@@ -56,16 +56,24 @@ const defaultAllowedOrigins = [
 
 const allowedOriginsSet = new Set([...defaultAllowedOrigins, ...envOrigins]);
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  const cleanOrigin = origin.replace(/\/$/, '');
+  if (allowedOriginsSet.has(cleanOrigin)) return true;
+  // Vercel deployment URL'lerini otomatik olarak kabul et (preview ve production)
+  if (/^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(cleanOrigin)) return true;
+  // Localhost ve 127.0.0.1 (tüm portlar)
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) return true;
+  return false;
+};
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
-      if (!origin) return callback(null, true);
-      const cleanOrigin = origin.replace(/\/$/, '');
-      if (allowedOriginsSet.has(cleanOrigin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
-      return callback(new Error(`CORS policy: "${origin}" adresinden erişim reddedildi.`));
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -73,11 +81,23 @@ app.use(
   })
 );
 
-// Routes
-app.use('/api/auth', authRoutes);
+// Vercel Serverless Rewrite URL Fix:
+// Vercel rewrites bazen req.url'i '/api/index.js' veya '/api' olarak Express'e aktarabilir.
+// Bu middleware, orijinal gelen istek yolunu (req.originalUrl) korur.
+app.use((req, res, next) => {
+  if (req.url === '/api/index.js' || req.url === '/api' || req.url === '/' || req.url.startsWith('/api/index.js')) {
+    if (req.originalUrl && req.originalUrl !== req.url) {
+      req.url = req.originalUrl;
+    }
+  }
+  next();
+});
+
+// Routes (Hem /api/... hem de direct /... rotalarını destekler)
+app.use(['/api/auth', '/auth'], authRoutes);
 
 // Task routes — dosya yükleme için upload middleware'i sadece /upload endpoint'ine uygulanır
-app.use('/api/tasks', (req, res, next) => {
+app.use(['/api/tasks', '/tasks'], (req, res, next) => {
   if (req.path === '/upload' && req.method === 'POST') {
     upload.single('file')(req, res, next);
   } else {
@@ -85,8 +105,24 @@ app.use('/api/tasks', (req, res, next) => {
   }
 }, taskRoutes);
 
-app.get('/api', (req, res) => {
+// Health check / Base API endpoint
+app.get(['/api', '/api/index.js', '/api/health', '/health'], (req, res) => {
   res.json({ status: 'ok', message: 'Club Dashboard API Running' });
+});
+
+// API 404 Handler - Express varsayılan HTML hata sayfası yerine JSON döndürür
+app.use((req, res) => {
+  res.status(404).json({
+    error: `API rotası bulunamadı: ${req.method} ${req.originalUrl || req.url}`
+  });
+});
+
+// Global Error Handler - Her zaman HTML yerine JSON formatında hata döner
+app.use((err, req, res, next) => {
+  console.error('API Error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Sunucu içi hata oluştu.'
+  });
 });
 
 export default app;

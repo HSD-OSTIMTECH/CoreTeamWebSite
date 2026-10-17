@@ -40,7 +40,18 @@ function Login() {
         })
       });
 
-      const data = await response.json();
+      let data = {};
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(
+          !response.ok
+            ? `Sunucu hatası (${response.status}): Vercel ortam değişkenlerini veya API durumunu kontrol edin.`
+            : 'Sunucudan geçersiz yanıt formatı alındı.'
+        );
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Giriş başarısız');
