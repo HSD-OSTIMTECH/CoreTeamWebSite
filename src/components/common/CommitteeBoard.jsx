@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { PRIORITY_OPTIONS, getPriorityMeta } from '../../lib/priority';
 import { sanitizeUrl, validateFileUpload } from '../../lib/security';
+import { matchesMember } from '../../lib/search';
 import './CommitteeBoard.css';
 
 const CommitteeBoard = ({
@@ -279,6 +280,7 @@ const CommitteeBoard = ({
   };
 
   const openEditModal = (task) => {
+    setSearchTerm('');
     const orig = fetchedTasks.find(t => t.id === task.id);
     setFormData({
       id: task.id,
@@ -406,10 +408,7 @@ const CommitteeBoard = ({
   const isTaskCreator = formData.creator_id && user?.id && String(formData.creator_id) === String(user.id);
   const canManageAssignees = userIsManager || (isEditing ? isTaskCreator : true);
 
-  const filteredMembers = members.filter(m => 
-    m.username?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (m.rank && m.rank.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredMembers = members.filter(m => matchesMember(m, searchTerm));
 
   return (
     <div className="page-container">
@@ -738,7 +737,11 @@ const CommitteeBoard = ({
                       </div>
 
                       <div style={{ maxHeight: '130px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem', backgroundColor: 'var(--bg-color)' }}>
-                        {filteredMembers.map(m => {
+                        {filteredMembers.length === 0 ? (
+                          <div style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                            Eşleşen üye bulunamadı.
+                          </div>
+                        ) : filteredMembers.map(m => {
                           const isSelected = formData.assignedUsers.includes(m.id);
                           return (
                             <div 

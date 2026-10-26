@@ -12,6 +12,7 @@ import {
 import { isManager } from '../lib/roles';
 import { PRIORITY_OPTIONS, getPriorityMeta } from '../lib/priority';
 import { sanitizeUrl, validateFileUpload } from '../lib/security';
+import { matchesMember } from '../lib/search';
 
 const DEFAULT_COMMITTEE_COLUMNS = {
   etkinlik: 'PLANLAMA',
@@ -266,10 +267,7 @@ const MyTasks = () => {
     setIsEditing(false);
   };
 
-  const filteredMembers = members.filter(m => 
-    m.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.rank?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMembers = members.filter(m => matchesMember(m, searchTerm));
 
   return (
     <div className="page-container">

@@ -6,6 +6,7 @@ import {
   UserCheck, Users, Send, Calendar
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { matchesMember } from '../lib/search';
 import { isManager, normalizeRank } from '../lib/roles';
 import { useToast } from '../context/ToastContext';
 
@@ -138,10 +139,7 @@ const Announcements = () => {
     }
   };
 
-  const filteredMembers = members.filter(m => 
-    m.username?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    normalizeRank(m.rank).includes(searchTerm.toLowerCase())
-  );
+  const filteredMembers = members.filter(m => matchesMember(m, searchTerm));
 
   const canCreate = isManager(currentUser);
 
@@ -264,7 +262,11 @@ const Announcements = () => {
                   </div>
 
                   <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '0.5rem' }}>
-                    {filteredMembers.map(member => (
+                    {filteredMembers.length === 0 ? (
+                      <div style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                        Eşleşen üye bulunamadı.
+                      </div>
+                    ) : filteredMembers.map(member => (
                       <div 
                         key={member.id} 
                         onClick={() => {
