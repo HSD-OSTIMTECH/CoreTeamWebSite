@@ -3,18 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { API_BASE_URL } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { Lock, User, ChevronRight, Sun, Moon, Eye, EyeOff } from 'lucide-react';
+import { Lock, User, ChevronRight, Sun, Moon, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 function Login() {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(document.body.classList.contains('dark-mode'));
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const expiredMsg = sessionStorage.getItem('session_expired_message');
+    if (expiredMsg) {
+      sessionStorage.removeItem('session_expired_message');
+      setSessionExpiredNotice(expiredMsg);
+    }
+  }, []);
 
   const toggleTheme = () => {
     const isDark = document.body.classList.toggle('dark-mode');
@@ -26,6 +35,7 @@ function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSessionExpiredNotice(null);
 
     try {
       // Backend API'sine çağrı yapıyoruz
@@ -147,6 +157,27 @@ function Login() {
           <p style={{ color: 'var(--text-muted)', fontSize: '0.925rem' }}>Lütfen devam etmek için kullanıcı adınızla giriş yapın.</p>
         </div>
         
+        {sessionExpiredNotice && (
+          <div style={{ 
+            background: 'rgba(245, 158, 11, 0.1)', 
+            color: '#f59e0b', 
+            padding: '12px 16px', 
+            borderRadius: '12px', 
+            marginBottom: '24px', 
+            fontSize: '0.875rem',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            textAlign: 'left'
+          }}>
+            <AlertCircle size={20} style={{ flexShrink: 0 }} />
+            <div>
+              <span style={{ fontWeight: '600' }}>Oturum Bilgisi:</span> {sessionExpiredNotice}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div style={{ 
             background: 'rgba(239, 68, 68, 0.05)', 
@@ -223,7 +254,7 @@ function Login() {
                 required
               />
               <button 
-                type="button"
+                type="button" 
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: 'absolute',

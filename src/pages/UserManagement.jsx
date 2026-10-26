@@ -144,9 +144,8 @@ const UserManagement = () => {
 
     try {
       setSubmitting(true);
-      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const res = await apiFetch('/api/auth/register', {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(formData)
       });
 
@@ -184,9 +183,8 @@ const UserManagement = () => {
     if (!confirmDel) return;
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/users/${userToDelete.id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
+      const res = await apiFetch(`/api/auth/users/${userToDelete.id}`, {
+        method: 'DELETE'
       });
 
       if (!res.ok) {
@@ -220,9 +218,8 @@ const UserManagement = () => {
 
     try {
       setEditSubmitting(true);
-      const res = await fetch(`${API_BASE_URL}/api/auth/users/${editingUser.id}`, {
+      const res = await apiFetch(`/api/auth/users/${editingUser.id}`, {
         method: 'PUT',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(editFormData)
       });
 

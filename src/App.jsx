@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -12,10 +12,24 @@ import Login from './pages/Login';
 import Announcements from './pages/Announcements';
 import UserManagement from './pages/UserManagement';
 import { useAuth } from './context/AuthContext';
+import { useToast } from './context/ToastContext';
 import { canManageCommittee, canManageUsers } from './lib/roles';
 
 function App() {
   const { user, session, loading } = useAuth();
+  const { warning } = useToast();
+
+  useEffect(() => {
+    const handleSessionExpired = (e) => {
+      const msg = e?.detail?.message || 'Oturum süreniz doldu. Lütfen tekrar giriş yapın.';
+      warning(msg, 6000);
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('auth:session-expired', handleSessionExpired);
+    };
+  }, [warning]);
 
   if (loading) {
     return (

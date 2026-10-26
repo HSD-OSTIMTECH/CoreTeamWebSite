@@ -46,3 +46,54 @@ export const validateFileUpload = (file, maxSizeMB = 15) => {
 
   return { valid: true };
 };
+
+/**
+ * Safely parses the payload of a JWT token without verifying the signature.
+ * (Signature verification is strictly enforced server-side with JWT_SECRET).
+ * @param {string} token
+ * @returns {object|null}
+ */
+export const parseJwt = (token) => {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+
+  try {
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (err) {
+    return null;
+  }
+};
+
+/**
+ * Checks whether the JWT token is expired based on its `exp` claim.
+ * @param {string} token
+ * @param {number} [bufferMs=0] - Optional buffer in ms (e.g. 5000ms for 5s early warning)
+ * @returns {boolean}
+ */
+export const isTokenExpired = (token, bufferMs = 0) => {
+  const payload = parseJwt(token);
+  if (!payload || !payload.exp) return true;
+  return Date.now() + bufferMs >= payload.exp * 1000;
+};
+
+/**
+ * Returns remaining milliseconds until token expiration.
+ * Returns 0 if already expired or invalid.
+ * @param {string} token
+ * @returns {number}
+ */
+export const getTokenRemainingMs = (token) => {
+  const payload = parseJwt(token);
+  if (!payload || !payload.exp) return 0;
+  const remaining = payload.exp * 1000 - Date.now();
+  return remaining > 0 ? remaining : 0;
+};

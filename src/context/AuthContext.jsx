@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { isTokenExpired, getTokenRemainingMs } from '../lib/security';
+import { dispatchSessionExpired } from '../lib/api';
 
 const AuthContext = createContext(null);
 
@@ -7,6 +9,33 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const expiryTimerRef = useRef(null);
+
+  const clearExpiryTimer = useCallback(() => {
+    if (expiryTimerRef.current) {
+      clearTimeout(expiryTimerRef.current);
+      expiryTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleExpiry = useCallback((token) => {
+    clearExpiryTimer();
+    if (!token) return;
+
+    const remainingMs = getTokenRemainingMs(token);
+    if (remainingMs <= 0) {
+      dispatchSessionExpired('Oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+      setUser(null);
+      setSession(null);
+      return;
+    }
+
+    expiryTimerRef.current = setTimeout(() => {
+      dispatchSessionExpired('Oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+      setUser(null);
+      setSession(null);
+    }, remainingMs);
+  }, [clearExpiryTimer]);
 
   const loadUserFromStorage = () => {
     try {
@@ -18,18 +47,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const syncAuth = async () => {
+  const syncAuth = useCallback(async () => {
     try {
       const { data: { session: authSession } } = await supabase.auth.getSession();
       const customUser = loadUserFromStorage();
+      const token = localStorage.getItem('token');
 
       if (authSession) {
+        clearExpiryTimer();
         setSession(authSession);
         setUser(authSession.user);
       } else if (customUser) {
-        setSession({ user: customUser, isCustom: true });
-        setUser(customUser);
+        if (!token || isTokenExpired(token)) {
+          // Token süresi geçmiş veya token yoksa temizle ve oturum kapandı uyarısı ver
+          dispatchSessionExpired('Oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+          clearExpiryTimer();
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession({ user: customUser, isCustom: true });
+          setUser(customUser);
+          scheduleExpiry(token);
+        }
       } else {
+        clearExpiryTimer();
         setSession(null);
         setUser(null);
       }
@@ -38,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clearExpiryTimer, scheduleExpiry]);
 
   useEffect(() => {
     syncAuth();
@@ -46,38 +87,56 @@ export const AuthProvider = ({ children }) => {
     // Supabase auth değişikliklerini dinle
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       if (currentSession) {
+        clearExpiryTimer();
         setSession(currentSession);
         setUser(currentSession.user);
       } else {
-        const customUser = loadUserFromStorage();
-        if (customUser) {
-          setSession({ user: customUser, isCustom: true });
-          setUser(customUser);
-        } else {
-          setSession(null);
-          setUser(null);
-        }
+        syncAuth();
       }
     });
 
     // Sekmeler arası ve localStorage değişikliklerini dinle
     const handleStorageChange = () => {
-      const customUser = loadUserFromStorage();
-      if (customUser) {
-        setSession({ user: customUser, isCustom: true });
-        setUser(customUser);
-      } else {
-        syncAuth();
+      syncAuth();
+    };
+
+    // Sekme görünür olduğunda veya odaklandığında token süresini anlık denetle
+    const verifyTokenOnFocus = () => {
+      const token = localStorage.getItem('token');
+      if (token && isTokenExpired(token)) {
+        dispatchSessionExpired('Oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+        clearExpiryTimer();
+        setUser(null);
+        setSession(null);
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        verifyTokenOnFocus();
+      }
+    };
+
+    const handleSessionExpiredEvent = () => {
+      clearExpiryTimer();
+      setUser(null);
+      setSession(null);
+    };
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', verifyTokenOnFocus);
+    window.addEventListener('auth:session-expired', handleSessionExpiredEvent);
 
     return () => {
       subscription.unsubscribe();
+      clearExpiryTimer();
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', verifyTokenOnFocus);
+      window.removeEventListener('auth:session-expired', handleSessionExpiredEvent);
     };
-  }, []);
+  }, [syncAuth, clearExpiryTimer]);
 
   const login = (userData, token) => {
     if (userData) {
@@ -86,12 +145,15 @@ export const AuthProvider = ({ children }) => {
     if (token) {
       localStorage.setItem('token', token);
     }
+    sessionStorage.removeItem('session_expired_message');
     setUser(userData);
     setSession({ user: userData, isCustom: true });
+    scheduleExpiry(token);
     window.dispatchEvent(new Event('storage'));
   };
 
   const logout = async () => {
+    clearExpiryTimer();
     try {
       await supabase.auth.signOut();
     } catch (err) {
@@ -99,6 +161,7 @@ export const AuthProvider = ({ children }) => {
     }
     localStorage.removeItem('custom_user');
     localStorage.removeItem('token');
+    sessionStorage.removeItem('session_expired_message');
     setUser(null);
     setSession(null);
     window.dispatchEvent(new Event('storage'));

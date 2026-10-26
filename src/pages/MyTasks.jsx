@@ -127,10 +127,8 @@ const MyTasks = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE_URL}/api/tasks/upload`, {
+      const res = await apiFetch('/api/tasks/upload', {
         method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData
       });
 

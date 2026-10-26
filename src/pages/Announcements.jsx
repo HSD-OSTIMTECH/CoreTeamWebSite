@@ -5,7 +5,7 @@ import {
   Trash2, Filter, AlertCircle, Info, Megaphone,
   UserCheck, Users, Send, Calendar
 } from 'lucide-react';
-import { API_BASE_URL, getAuthHeaders } from '../lib/api';
+import { apiFetch } from '../lib/api';
 import { isManager, normalizeRank } from '../lib/roles';
 import { useToast } from '../context/ToastContext';
 
@@ -62,9 +62,7 @@ const Announcements = () => {
 
       // Duyuruları Backend API'den çek
       try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/announcements/${userObj.id}`, {
-          headers: getAuthHeaders()
-        });
+        const response = await apiFetch(`/api/auth/announcements/${userObj.id}`);
         if (response.ok) {
           const data = await response.json();
           setAnnouncements(data || []);
@@ -79,9 +77,7 @@ const Announcements = () => {
       // Yönetici ise üyeleri çek
       if (isManager(userObj)) {
         try {
-          const memsResponse = await fetch(`${API_BASE_URL}/api/auth/users`, {
-            headers: getAuthHeaders()
-          });
+          const memsResponse = await apiFetch('/api/auth/users');
           if (memsResponse.ok) {
             const mems = await memsResponse.json();
             setMembers(mems || []);
@@ -106,9 +102,8 @@ const Announcements = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/announcements`, {
+      const response = await apiFetch('/api/auth/announcements', {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           title: formData.title,
           content: formData.content,
