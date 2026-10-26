@@ -38,6 +38,8 @@ function Login() {
     setSessionExpiredNotice(null);
 
     try {
+      const cleanUsername = username.trim().toLocaleLowerCase('tr-TR');
+
       // Backend API'sine çağrı yapıyoruz
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
@@ -45,7 +47,7 @@ function Login() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          username,
+          username: cleanUsername,
           password
         })
       });

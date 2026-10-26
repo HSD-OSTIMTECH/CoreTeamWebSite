@@ -149,7 +149,6 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
     setSession({ user: userData, isCustom: true });
     scheduleExpiry(token);
-    window.dispatchEvent(new Event('storage'));
   };
 
   const logout = async () => {

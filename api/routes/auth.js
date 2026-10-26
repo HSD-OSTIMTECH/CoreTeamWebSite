@@ -42,17 +42,8 @@ router.use((req, res, next) => {
 // Parse incoming Bearer tokens if present (non-breaking)
 router.use(verifyTokenOptional);
 
-// Rate Limiting for Login endpoint - Brute-force protection (Bulgu #6)
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 dakika
-  max: 10, // IP başına 15 dakikada en fazla 10 istek
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Çok fazla giriş denemesi yapıldı. Lütfen 15 dakika sonra tekrar deneyin.' }
-});
-
-// Login (Bulgu #2, #5, #6, #9)
-router.post('/login', loginLimiter, async (req, res) => {
+// Login (Herhangi bir şifre bekleme / kilitlenme süresi olmadan doğrudan giriş)
+router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -60,12 +51,14 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Kullanıcı adı ve şifre zorunludur.' });
     }
 
-    // Fetch user from custom_users table in Supabase
+    const cleanUsername = String(username || '').trim().toLocaleLowerCase('tr-TR');
+
+    // Fetch user from custom_users table in Supabase (büyük/küçük harf duyarsız ve boşluksuz)
     const { data: user, error } = await supabase
       .from('custom_users')
       .select('*')
-      .eq('username', username)
-      .single();
+      .ilike('username', cleanUsername)
+      .maybeSingle();
 
     if (error || !user) {
       // Kullanıcı bulunamadı — user enumeration önleme: aynı mesaj döndür
