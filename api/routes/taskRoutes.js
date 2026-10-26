@@ -331,6 +331,26 @@ router.put('/:taskId/column', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Sütun ID gereklidir.' });
     }
 
+    // Görevi ve atanan kişileri doğrula (BOLA / IDOR Koruması)
+    const { data: task, error: fetchError } = await supabase
+      .from('tasks')
+      .select('id, creator_id, committee, task_assignments(user_id)')
+      .eq('id', taskId)
+      .maybeSingle();
+
+    if (fetchError || !task) {
+      return res.status(404).json({ error: 'Görev bulunamadı.' });
+    }
+
+    const isManager = MANAGEMENT_RANKS.includes(normalizeRank(req.user?.rank));
+    const isCreator = String(req.user?.id) === String(task.creator_id);
+    const isAssigned = Array.isArray(task.task_assignments) && task.task_assignments.some(a => String(a.user_id) === String(req.user?.id));
+    const hasCommitteeRole = Array.isArray(req.user?.roles) && req.user.roles.includes(task.committee);
+
+    if (!isManager && !isCreator && !isAssigned && !hasCommitteeRole) {
+      return res.status(403).json({ error: 'Bu görevin sütununu değiştirme yetkiniz bulunmuyor.' });
+    }
+
     const isCompleted = column_id.toLowerCase().includes('tamam');
     const { error } = await supabase
       .from('tasks')
@@ -364,11 +384,17 @@ router.post('/upload', requireAuth, async (req, res) => {
 
     const file = req.file;
 
-    // Validate file extension
-    const blockedExtensions = ['exe', 'bat', 'cmd', 'sh', 'php', 'vbs', 'scr', 'msi', 'com', 'pif', 'html', 'htm'];
-    const ext = (file.originalname.split('.').pop() || '').toLowerCase();
-    if (blockedExtensions.includes(ext)) {
-      return res.status(400).json({ error: 'Bu dosya türünün yüklenmesine güvenlik sebebiyle izin verilmiyor.' });
+    // Güvenli dosya uzantıları beyaz listesi (Stored XSS ve SVG istismarlarını engeller)
+    const ALLOWED_EXTENSIONS = [
+      'pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif',
+      'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+      'zip', 'rar', '7z', 'tar', 'gz', 'txt', 'csv'
+    ];
+    const ext = (file.originalname.split('.').pop() || '').toLowerCase().trim();
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return res.status(400).json({
+        error: 'Güvenlik sebebiyle bu dosya türüne izin verilmiyor. Yalnızca PDF, görsel (PNG, JPG, WEBP, GIF), ofis belgesi ve arşiv yükleyebilirsiniz.'
+      });
     }
 
     // 15MB limit

@@ -38,10 +38,17 @@ export const validateFileUpload = (file, maxSizeMB = 15) => {
     return { valid: false, error: `Dosya boyutu çok yüksek. Maksimum sınır: ${maxSizeMB}MB.` };
   }
 
-  const blockedExtensions = ['exe', 'bat', 'cmd', 'sh', 'php', 'vbs', 'scr', 'msi', 'com', 'pif', 'html', 'htm'];
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
-  if (blockedExtensions.includes(ext)) {
-    return { valid: false, error: 'Bu dosya türünün yüklenmesine güvenlik sebebiyle izin verilmiyor.' };
+  const allowedExtensions = [
+    'pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif',
+    'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'zip', 'rar', '7z', 'tar', 'gz', 'txt', 'csv'
+  ];
+  const ext = (file.name.split('.').pop() || '').toLowerCase().trim();
+  if (!allowedExtensions.includes(ext)) {
+    return {
+      valid: false,
+      error: 'Güvenlik sebebiyle bu dosya türüne izin verilmiyor. Yalnızca PDF, görsel (PNG, JPG, WEBP, GIF), ofis belgesi ve arşiv yükleyebilirsiniz.'
+    };
   }
 
   return { valid: true };

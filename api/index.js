@@ -60,8 +60,8 @@ const isAllowedOrigin = (origin) => {
   if (!origin) return true;
   const cleanOrigin = origin.replace(/\/$/, '');
   if (allowedOriginsSet.has(cleanOrigin)) return true;
-  // Vercel deployment URL'lerini otomatik olarak kabul et (preview ve production)
-  if (/^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(cleanOrigin)) return true;
+  // Sadece bu projenin Vercel deployment URL'lerini kabul et (production ve preview)
+  if (/^https:\/\/core-team-web-site(-[a-zA-Z0-9_-]+)?\.vercel\.app$/.test(cleanOrigin)) return true;
   // Localhost ve 127.0.0.1 (tüm portlar)
   if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) return true;
   return false;

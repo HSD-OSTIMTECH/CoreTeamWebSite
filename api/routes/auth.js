@@ -42,8 +42,17 @@ router.use((req, res, next) => {
 // Parse incoming Bearer tokens if present (non-breaking)
 router.use(verifyTokenOptional);
 
-// Login (Herhangi bir şifre bekleme / kilitlenme süresi olmadan doğrudan giriş)
-router.post('/login', async (req, res) => {
+// Soft Bot Limiter: 1 dakikada en fazla 30 istek (insanları asla engellemez, bot kaba kuvvetini durdurur)
+const loginBotLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Çok fazla istek gönderildi. Lütfen bir dakika bekleyin.' }
+});
+
+// Login
+router.post('/login', loginBotLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -268,7 +277,7 @@ router.get('/notifications/:userId', requireAuth, async (req, res) => {
     }
 
     // IDOR Koruması: Sadece kullanıcı kendi bildirimlerini veya Adminler görebilir
-    if (req.user?.id !== userId && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
+    if (String(req.user?.id) !== String(userId) && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
       return res.status(403).json({ error: 'Sadece kendi bildirimlerinize erişebilirsiniz.' });
     }
 
@@ -301,7 +310,7 @@ router.put('/notifications/:userId/mark-read', requireAuth, async (req, res) => 
     }
 
     // IDOR Koruması: Sadece kullanıcı kendi bildirimlerini veya Adminler okundu işaretleyebilir
-    if (req.user?.id !== userId && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
+    if (String(req.user?.id) !== String(userId) && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
       return res.status(403).json({ error: 'Bu bildirimleri güncelleme yetkiniz bulunmuyor.' });
     }
 
@@ -333,7 +342,7 @@ router.get('/announcements/:userId', requireAuth, async (req, res) => {
     }
 
     // IDOR Koruması: Sadece kullanıcı kendi duyurularına veya Adminler erişebilir
-    if (req.user?.id !== userId && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
+    if (String(req.user?.id) !== String(userId) && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
       return res.status(403).json({ error: 'Sadece kendi duyurularınıza erişebilirsiniz.' });
     }
 
@@ -445,7 +454,7 @@ router.put('/announcements/:announcementId/mark-read', requireAuth, async (req, 
     }
 
     // IDOR Koruması: Sadece kullanıcı kendi duyurusunu veya Adminler okundu işaretleyebilir
-    if (req.user?.id !== userId && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
+    if (String(req.user?.id) !== String(userId) && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
       return res.status(403).json({ error: 'Bu duyuruyu güncelleme yetkiniz bulunmuyor.' });
     }
 
