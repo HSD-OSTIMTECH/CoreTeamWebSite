@@ -332,7 +332,7 @@ router.put('/notifications/:userId/mark-read', requireAuth, async (req, res) => 
   }
 });
 
-// Get announcements for a user (Authenticated only - IDOR protected) - Bulgu #4
+// Get all announcements (Visible to all authenticated members, including newly created accounts)
 router.get('/announcements/:userId', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -341,31 +341,14 @@ router.get('/announcements/:userId', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    // IDOR Koruması: Sadece kullanıcı kendi duyurularına veya Adminler erişebilir
+    // IDOR Koruması: Sadece kullanıcı kendi isteğiyle veya Adminler erişebilir
     if (String(req.user?.id) !== String(userId) && !ADMIN_RANKS.includes(normalizeRank(req.user?.rank))) {
-      return res.status(403).json({ error: 'Sadece kendi duyurularınıza erişebilirsiniz.' });
+      return res.status(403).json({ error: 'Bu işlem için yetkiniz bulunmuyor.' });
     }
-
-    const { data: recipients, error: recipientError } = await supabase
-      .from('announcement_recipients')
-      .select('announcement_id')
-      .eq('user_id', userId);
-
-    if (recipientError && recipientError.code !== 'PGRST116') {
-      console.error("Recipients Error:", recipientError);
-      return res.status(500).json({ error: 'Duyurular alınamadı.' });
-    }
-
-    if (!recipients || recipients.length === 0) {
-      return res.json([]);
-    }
-
-    const announcementIds = recipients.map(r => r.announcement_id);
 
     const { data, error } = await supabase
       .from('announcements')
       .select('*')
-      .in('id', announcementIds)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -380,19 +363,23 @@ router.get('/announcements/:userId', requireAuth, async (req, res) => {
   }
 });
 
-// Create announcement (Manager and Admin only)
+// Create announcement (Manager and Admin only — visible to everyone; recipient_ids receives notifications)
 router.post('/announcements', requireManager, async (req, res) => {
   try {
     const { title, content, creator_id, creator_name, recipient_ids } = req.body;
 
-    if (!title || !content || !creator_id || !recipient_ids || !Array.isArray(recipient_ids)) {
-      return res.status(400).json({ error: 'Gerekli alanlar eksik' });
+    if (!title?.trim() || !content?.trim()) {
+      return res.status(400).json({ error: 'Duyuru başlığı ve içeriği zorunludur.' });
     }
+
+    const safeCreatorId = req.user?.id || creator_id;
+    const safeCreatorName = req.user?.full_name || req.user?.username || creator_name || 'Sistem';
+    const targetRecipientIds = Array.isArray(recipient_ids) ? recipient_ids : [];
 
     // Create announcement
     const { data: annData, error: annError } = await supabase
       .from('announcements')
-      .insert([{ title, content, creator_id, creator_name }])
+      .insert([{ title: title.trim(), content: content.trim(), creator_id: safeCreatorId, creator_name: safeCreatorName }])
       .select()
       .single();
 
@@ -401,35 +388,38 @@ router.post('/announcements', requireManager, async (req, res) => {
       return res.status(500).json({ error: 'Duyuru kaydedilemedi.' });
     }
 
-    // Add recipients
-    const recipientData = recipient_ids.map(userId => ({
-      announcement_id: annData.id,
-      user_id: userId,
-      is_read: false
-    }));
+    let notifError = null;
 
-    const { error: recError } = await supabase
-      .from('announcement_recipients')
-      .insert(recipientData);
+    // Add recipients & notifications if any notification targets were selected
+    if (targetRecipientIds.length > 0) {
+      const recipientData = targetRecipientIds.map(userId => ({
+        announcement_id: annData.id,
+        user_id: userId,
+        is_read: false
+      }));
 
-    if (recError) {
-      console.error('Recipients insert error:', recError);
-      return res.status(500).json({ error: 'Duyuru alıcıları kaydedilemedi.' });
-    }
+      const { error: recError } = await supabase
+        .from('announcement_recipients')
+        .insert(recipientData);
 
-    // Create notifications for each recipient
-    const notifications = recipient_ids.map(userId => ({
-      user_id: userId,
-      message: `📢 Yeni duyuru: ${title}`,
-      is_read: false
-    }));
+      if (recError) {
+        console.warn('Recipients insert warning:', recError);
+      }
 
-    const { error: notifError } = await supabase
-      .from('notifications')
-      .insert(notifications);
+      const notifications = targetRecipientIds.map(userId => ({
+        user_id: userId,
+        message: `📢 Yeni duyuru: ${title.trim()}`,
+        is_read: false
+      }));
 
-    if (notifError) {
-      console.warn('Bildirimler oluşturulamadı ama duyuru başarılı:', notifError);
+      const { error: nError } = await supabase
+        .from('notifications')
+        .insert(notifications);
+
+      notifError = nError;
+      if (notifError) {
+        console.warn('Bildirimler oluşturulamadı ama duyuru başarılı:', notifError);
+      }
     }
 
     res.json({ 
@@ -440,6 +430,53 @@ router.post('/announcements', requireManager, async (req, res) => {
   } catch (err) {
     console.error('Duyuru oluşturma hatası:', err);
     res.status(500).json({ error: 'Duyuru oluşturulamadı.' });
+  }
+});
+
+// Delete announcement (Admin or creator manager)
+router.delete('/announcements/:announcementId', requireManager, async (req, res) => {
+  try {
+    const { announcementId } = req.params;
+    if (!announcementId) {
+      return res.status(400).json({ error: 'Duyuru ID gereklidir.' });
+    }
+
+    const { data: existingAnn, error: fetchError } = await supabase
+      .from('announcements')
+      .select('id, creator_id')
+      .eq('id', announcementId)
+      .maybeSingle();
+
+    if (fetchError || !existingAnn) {
+      return res.status(404).json({ error: 'Duyuru bulunamadı.' });
+    }
+
+    const isAdminUser = ADMIN_RANKS.includes(normalizeRank(req.user?.rank));
+    const isCreator = String(existingAnn.creator_id) === String(req.user?.id);
+    if (!isAdminUser && !isCreator) {
+      return res.status(403).json({ error: 'Bu duyuruyu silme yetkiniz bulunmuyor.' });
+    }
+
+    // İlişkili alıcı kayıtlarını temizle (cascade fallback)
+    await supabase
+      .from('announcement_recipients')
+      .delete()
+      .eq('announcement_id', announcementId);
+
+    const { error } = await supabase
+      .from('announcements')
+      .delete()
+      .eq('id', announcementId);
+
+    if (error) {
+      console.error('Duyuru silme hatası:', error);
+      return res.status(500).json({ error: 'Duyuru silinemedi.' });
+    }
+
+    res.json({ message: 'Duyuru başarıyla silindi.' });
+  } catch (err) {
+    console.error('Duyuru silme sunucu hatası:', err);
+    res.status(500).json({ error: 'Sunucu hatası oluştu.' });
   }
 });
 

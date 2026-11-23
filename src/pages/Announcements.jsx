@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { matchesMember } from '../lib/search';
-import { isManager, normalizeRank } from '../lib/roles';
+import { isAdmin, isManager } from '../lib/roles';
 import { useToast } from '../context/ToastContext';
 
 const Announcements = () => {
@@ -96,8 +96,8 @@ const Announcements = () => {
 
   const handleCreateAnnouncement = async (e) => {
     e.preventDefault();
-    if (formData.recipients.length === 0) {
-      warning('Lütfen en az bir alıcı seçin.');
+    if (!formData.title.trim() || !formData.content.trim()) {
+      warning('Lütfen duyuru başlığı ve içeriğini doldurun.');
       return;
     }
 
@@ -109,7 +109,7 @@ const Announcements = () => {
           title: formData.title,
           content: formData.content,
           creator_id: currentUser.id,
-          creator_name: currentUser.username || 'Bilinmiyor',
+          creator_name: currentUser.full_name || currentUser.username || 'Bilinmiyor',
           recipient_ids: formData.recipients
         })
       });
@@ -128,6 +128,27 @@ const Announcements = () => {
       toastError('Hata oluştu: ' + (err.message || 'Veritabanı hatası'));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (announcement) => {
+    if (!window.confirm(`"${announcement.title}" duyurusunu silmek istediğinize emin misiniz?`)) return;
+
+    try {
+      const response = await apiFetch(`/api/auth/announcements/${announcement.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Duyuru silinemedi');
+      }
+
+      setAnnouncements(prev => prev.filter(a => a.id !== announcement.id));
+      success('Duyuru silindi.');
+    } catch (err) {
+      console.error('Duyuru silme hatası:', err);
+      toastError(err.message || 'Duyuru silinirken bir hata oluştu.');
     }
   };
 
@@ -180,28 +201,53 @@ const Announcements = () => {
           <div style={{ textAlign: 'center', padding: '5rem 2rem', backgroundColor: 'var(--surface-color)', borderRadius: '2rem', border: '1px dashed var(--border-color)' }}>
             <Megaphone size={48} color="var(--text-muted)" style={{ marginBottom: '1rem', opacity: 0.2 }} />
             <h3 style={{ color: 'var(--text-main)', marginBottom: '0.5rem' }}>Henüz Duyuru Yok</h3>
-            <p style={{ color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto' }}>Henüz sizinle paylaşılmış bir duyuru bulunmuyor.</p>
+            <p style={{ color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto' }}>Henüz yayınlanmış bir duyuru bulunmuyor.</p>
           </div>
         ) : (
-          announcements.map(ann => (
-            <div key={ann.id} style={{ 
-              backgroundColor: 'var(--surface-color)', borderRadius: '20px', padding: '1.5rem', 
-              border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)',
-              position: 'relative', overflow: 'hidden'
-            }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: 'var(--primary-color)' }}></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.25rem' }}>{ann.title}</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><User size={12} /> {ann.creator_name || 'Sistem'}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Calendar size={12} /> {new Date(ann.created_at).toLocaleDateString('tr-TR')}</span>
+          announcements.map(ann => {
+            const canDeleteAnn = isAdmin(currentUser) || (isManager(currentUser) && String(ann.creator_id) === String(currentUser?.id));
+            return (
+              <div key={ann.id} style={{ 
+                backgroundColor: 'var(--surface-color)', borderRadius: '20px', padding: '1.5rem', 
+                border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)',
+                position: 'relative', overflow: 'hidden'
+              }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: 'var(--primary-color)' }}></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '1rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.25rem' }}>{ann.title}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><User size={12} /> {ann.creator_name || 'Sistem'}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Calendar size={12} /> {new Date(ann.created_at).toLocaleDateString('tr-TR')}</span>
+                    </div>
                   </div>
+                  {canDeleteAnn && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAnnouncement(ann)}
+                      title="Duyuruyu Sil"
+                      aria-label="Duyuruyu Sil"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--danger, #ef4444)',
+                        cursor: 'pointer',
+                        padding: '0.4rem',
+                        borderRadius: '8px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  )}
                 </div>
+                <p style={{ color: 'var(--text-main)', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>{ann.content}</p>
               </div>
-              <p style={{ color: 'var(--text-main)', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>{ann.content}</p>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -242,8 +288,8 @@ const Announcements = () => {
                 </div>
 
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>ALICILAR ({formData.recipients.length})</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>BİLDİRİM GİDECEK KİŞİLER ({formData.recipients.length})</label>
                     <button 
                       type="button" onClick={toggleAllMembers}
                       style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}
@@ -251,6 +297,9 @@ const Announcements = () => {
                       {formData.recipients.length === members.length ? 'Seçimi Kaldır' : 'Herkesi Seç'}
                     </button>
                   </div>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.75rem 0' }}>
+                    Duyurular tüm ekip üyelerine (sonradan eklenenler dahil) görünür. Seçtiğiniz kişilere ayrıca zil bildirimi gönderilir.
+                  </p>
                   
                   <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
                     <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -285,7 +334,10 @@ const Announcements = () => {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{member.username}</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{member.full_name || member.username}</span>
+                          {member.full_name && member.username && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>@{member.username}</span>
+                          )}
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{member.rank}</span>
                         </div>
                         {formData.recipients.includes(member.id) && <UserCheck size={16} color="var(--primary-color)" />}
