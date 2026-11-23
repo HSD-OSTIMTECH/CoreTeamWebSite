@@ -34,10 +34,10 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// Multer — Dosya yükleme middleware'i (memory storage)
+// Multer — Dosya yükleme middleware'i (memory storage, Vercel 4.5MB gövde limiti uyumlu)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 } // 15MB
+  limits: { fileSize: 4 * 1024 * 1024 } // 4MB
 });
 
 // CORS Whitelist Configuration

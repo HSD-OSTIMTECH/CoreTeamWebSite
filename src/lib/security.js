@@ -27,10 +27,10 @@ export const sanitizeUrl = (url) => {
 /**
  * Validates file upload for maximum size and disallowed dangerous executable extensions.
  * @param {File} file
- * @param {number} [maxSizeMB=15]
+ * @param {number} [maxSizeMB=4]
  * @returns {{ valid: boolean, error?: string }}
  */
-export const validateFileUpload = (file, maxSizeMB = 15) => {
+export const validateFileUpload = (file, maxSizeMB = 4) => {
   if (!file) return { valid: false, error: 'Dosya seçilmedi.' };
 
   const maxBytes = maxSizeMB * 1024 * 1024;
