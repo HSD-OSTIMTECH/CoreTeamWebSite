@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Search, Bell, HelpCircle, User, Menu, X, LogOut, Info, AlertCircle, Sun, Moon } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -11,6 +11,7 @@ const Header = ({ toggleSidebar }) => {
   const [rank, setRank] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const notificationsRef = useRef(null);
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(document.body.classList.contains('dark-mode'));
 
@@ -107,6 +108,29 @@ const Header = ({ toggleSidebar }) => {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (!showNotifications) return;
+
+    const handleClickOutside = (event) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showNotifications]);
+
   const handleLogout = async () => {
     await logout();
     setShowProfileModal(false);
@@ -144,6 +168,7 @@ const Header = ({ toggleSidebar }) => {
         >
           {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
+        <div ref={notificationsRef} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
         <button 
           className="btn-icon-only" 
           title="Bildirimler" 
@@ -240,6 +265,7 @@ const Header = ({ toggleSidebar }) => {
             </div>
           </div>
         )}
+        </div>
         
         <div className="user-profile" onClick={() => setShowProfileModal(true)} title={user?.username || user?.email || 'Kullanıcı'}>
           <div className="avatar" style={{ border: '2px solid var(--primary-color)', cursor: 'pointer' }}>

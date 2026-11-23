@@ -9,7 +9,12 @@ export default defineConfig({
     {
       name: 'express-api-middleware',
       configureServer(server) {
-        server.middlewares.use(apiApp);
+        server.middlewares.use((req, res, next) => {
+          if (req.url && (req.url === '/api' || req.url.startsWith('/api/'))) {
+            return apiApp(req, res, next);
+          }
+          next();
+        });
       }
     }
   ],

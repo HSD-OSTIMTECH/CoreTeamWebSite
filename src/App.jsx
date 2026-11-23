@@ -73,8 +73,6 @@ function App() {
         />
         <Route path="register" element={<Navigate to="/users" replace />} />
         <Route path="support" element={<Support />} />
-        <Route path="reports" element={<div className="page-container"><h2>Raporlar (Yapım Aşamasında)</h2></div>} />
-        <Route path="settings" element={<div className="page-container"><h2>Ayarlar (Yapım Aşamasında)</h2></div>} />
       </Route>
 
       {/* Herhangi bir rotaya uymayanları ana sayfaya yönlendir */}

@@ -92,6 +92,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [allTasks, setAllTasks] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedDayGroup, setSelectedDayGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
@@ -352,7 +353,17 @@ const Dashboard = () => {
                   key={cell.key}
                   className={`dashboard-calendar-cell ${cell.inCurrentMonth ? '' : 'is-outside'} ${cell.key === todayKey ? 'is-today' : ''}`}
                   style={{ cursor: hasItems ? 'pointer' : 'default' }}
-                  onClick={() => hasItems && setSelectedItem(allDayItems[0])}
+                  onClick={() => {
+                    if (!hasItems) return;
+                    if (allDayItems.length === 1) {
+                      setSelectedItem(allDayItems[0]);
+                    } else {
+                      setSelectedDayGroup({
+                        dateLabel: cell.date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }),
+                        items: allDayItems
+                      });
+                    }
+                  }}
                 >
                   <span className="dashboard-day-number">{cell.day}</span>
 
@@ -371,6 +382,10 @@ const Dashboard = () => {
                           <span
                             key={`${item.id}-${idx}`}
                             title={`${item.title} (${item.committee})`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedItem(item);
+                            }}
                             style={{
                               width: '14px',
                               height: '14px',
@@ -381,7 +396,8 @@ const Dashboard = () => {
                               fontWeight: 'bold',
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center'
+                              justifyContent: 'center',
+                              cursor: 'pointer'
                             }}
                           >
                             {letter}
@@ -437,6 +453,82 @@ const Dashboard = () => {
           </div>
         </section>
       </div>
+
+      {/* Günlük Çoklu Görev / Etkinlik Seçim Pop-up */}
+      {selectedDayGroup && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={() => setSelectedDayGroup(null)}></div>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '480px', backgroundColor: 'var(--surface-color)', borderRadius: '24px', padding: '1.75rem', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-color)', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="flex justify-between items-center" style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'var(--primary-bg)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CalendarDays size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>{selectedDayGroup.dateLabel}</h2>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{selectedDayGroup.items.length} kayıt bulundu</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedDayGroup(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={22} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', paddingRight: '2px' }}>
+              {selectedDayGroup.items.map((item) => {
+                const comm = (item.committee || 'genel').toLowerCase();
+                let bgColor = 'var(--primary-color)';
+                if (comm === 'etkinlik') bgColor = '#ef4444';
+                if (comm === 'proje') bgColor = '#3b82f6';
+                if (comm === 'medium') bgColor = '#10b981';
+                if (comm === 'sosyal') bgColor = '#f59e0b';
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDayGroup(null);
+                      setSelectedItem(item);
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '0.9rem 1rem',
+                      borderRadius: '14px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--bg-color)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem'
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: bgColor, flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                          {item.committee || 'genel'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {item.title}
+                      </div>
+                      {item.description && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Görev Detay Pop-up */}
       {selectedItem && (
