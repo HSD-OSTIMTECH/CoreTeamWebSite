@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { apiFetch, API_BASE_URL } from '../lib/api';
+import { apiFetch } from '../lib/api';
+import { getDateConstraints } from '../lib/dateConstraints';
 import Card from '../components/common/Card';
-import Badge from '../components/common/Badge';
+import TaskFormModal from '../components/common/TaskFormModal';
 import { 
-  Calendar, Plus, Users, Trash2, Edit2, CheckCircle, Clock, X, 
-  AlertCircle, Search, UserCheck, Link as LinkIcon, FileText, Upload, Lock 
+  Plus, Users, Trash2, Edit2, CheckCircle, Clock, X, 
+  UserCheck, Link as LinkIcon, FileText
 } from 'lucide-react';
-import { isManager } from '../lib/roles';
-import { PRIORITY_OPTIONS, getPriorityMeta } from '../lib/priority';
+import { isManager, isAdmin, isCommitteeManager } from '../lib/roles';
+import { getPriorityMeta } from '../lib/priority';
 import { sanitizeUrl, validateFileUpload } from '../lib/security';
-import { matchesMember } from '../lib/search';
 
 const DEFAULT_COMMITTEE_COLUMNS = {
   etkinlik: 'PLANLAMA',
@@ -30,9 +30,7 @@ const MyTasks = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
-  
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
+  const { minDateString, maxDateString } = getDateConstraints();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -43,6 +41,10 @@ const MyTasks = () => {
     link_url: '',
     attachment_url: '',
     committee: '',
+    originalCommittee: '',
+    column_id: '',
+    start_date: '',
+    end_date: '',
     priority: 'NORMAL'
   });
   const [selectedFile, setSelectedFile] = useState(null);
@@ -118,7 +120,7 @@ const MyTasks = () => {
 
   const uploadFile = async (file) => {
     try {
-      const validation = validateFileUpload(file, 15);
+      const validation = validateFileUpload(file, 4);
       if (!validation.valid) {
         toastError(validation.error);
         return null;
@@ -167,16 +169,22 @@ const MyTasks = () => {
         }
       }
 
+      const targetCommittee = formData.committee || 'genel';
+      const committeeChanged = isEditing && targetCommittee !== (formData.originalCommittee || 'genel');
       const defaultCol = formData.committee ? (DEFAULT_COMMITTEE_COLUMNS[formData.committee] || 'PLANLAMA') : 'PLANLAMA';
+      const preservedColumnId = (isEditing && !committeeChanged && formData.column_id) ? formData.column_id : defaultCol;
+
       const payload = {
         title: formData.title,
         description: formData.description,
         link_url: formData.link_url,
         attachment_url: currentAttachmentUrl,
-        committee: formData.committee || 'genel',
-        column_id: defaultCol,
+        committee: targetCommittee,
+        column_id: preservedColumnId,
         priority: formData.priority || 'NORMAL',
-        assignedUsers: formData.assignedUsers
+        assignedUsers: formData.assignedUsers,
+        start_date: formData.start_date ? new Date(formData.start_date).toISOString() : null,
+        end_date: formData.end_date ? new Date(formData.end_date).toISOString() : null
       };
 
       if (isEditing && formData.id) {
@@ -228,7 +236,7 @@ const MyTasks = () => {
   };
 
   const toggleTaskStatus = async (task) => {
-    const myAssignment = task.task_assignments.find(a => a.user_id === user.id);
+    const myAssignment = task.task_assignments.find(a => String(a.user_id) === String(user?.id));
     if (!myAssignment) return;
 
     try {
@@ -237,10 +245,17 @@ const MyTasks = () => {
         const errData = await res.json();
         throw new Error(errData.error || 'Durum güncellenemedi');
       }
+      const data = await res.json();
       await fetchData();
       notifyDashboardRefresh();
+      if (data.status === 'completed') {
+        success(data.allCompleted ? 'Görev tamamlandı ve komite panosunda Tamamlandı sütununa taşındı.' : 'Kendi göreviniz tamamlandı olarak işaretlendi.');
+      } else {
+        success('Görev durumu geri alındı.');
+      }
     } catch (err) {
       console.error('Durum güncelleme hatası:', err);
+      toastError(err.message || 'Durum güncellenemedi.');
     }
   };
 
@@ -252,7 +267,11 @@ const MyTasks = () => {
       assignedUsers: task.task_assignments.map(a => a.user_id),
       link_url: task.link_url || '',
       attachment_url: task.attachment_url || '',
-      committee: task.committee || '',
+      committee: task.committee === 'genel' ? '' : (task.committee || ''),
+      originalCommittee: task.committee || 'genel',
+      column_id: task.column_id || '',
+      start_date: task.start_date ? task.start_date.split('T')[0] : '',
+      end_date: task.end_date ? task.end_date.split('T')[0] : '',
       priority: task.priority || 'NORMAL'
     });
     setSelectedFile(null);
@@ -261,13 +280,31 @@ const MyTasks = () => {
   };
 
   const resetForm = () => {
-    setFormData({ id: null, title: '', description: '', assignedUsers: [], link_url: '', attachment_url: '', committee: '', priority: 'NORMAL' });
+    setFormData({
+      id: null,
+      title: '',
+      description: '',
+      assignedUsers: [],
+      link_url: '',
+      attachment_url: '',
+      committee: '',
+      originalCommittee: '',
+      column_id: '',
+      start_date: '',
+      end_date: '',
+      priority: 'NORMAL'
+    });
     setSelectedFile(null);
-    setSearchTerm('');
     setIsEditing(false);
   };
 
-  const filteredMembers = members.filter(m => matchesMember(m, searchTerm));
+  const committeeSelectOptions = [
+    { value: '', label: 'Genel (Hiçbiri)' },
+    ...((isAdmin(user) || user?.roles?.includes('proje')) ? [{ value: 'proje', label: 'Teknoloji ve Proje' }] : []),
+    ...((isAdmin(user) || user?.roles?.includes('etkinlik')) ? [{ value: 'etkinlik', label: 'Etkinlik ve Sponsorluk' }] : []),
+    ...((isAdmin(user) || user?.roles?.includes('sosyal')) ? [{ value: 'sosyal', label: 'Sosyal Medya' }] : []),
+    ...((isAdmin(user) || user?.roles?.includes('medium')) ? [{ value: 'medium', label: 'Medium' }] : [])
+  ];
 
   return (
     <div className="page-container">
@@ -323,232 +360,25 @@ const MyTasks = () => {
       )}
 
       {/* Modal */}
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} onClick={() => setShowModal(false)}></div>
-          <div style={{ 
-            position: 'relative', 
-            width: '100%', 
-            maxWidth: '550px', 
-            backgroundColor: 'var(--surface-color)', 
-            borderRadius: '24px', 
-            padding: '2rem', 
-            boxShadow: 'var(--shadow-lg)', 
-            border: '1px solid var(--border-color)',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}>
-            <div className="flex justify-between items-center" style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: '800' }}>{isEditing ? 'Görevi Düzenle' : 'Yeni Görev Ata'}</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={24} /></button>
-            </div>
-
-            <form onSubmit={handleCreateOrUpdateTask}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                 <div style={{ marginBottom: '1.25rem', gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Görev Başlığı</label>
-                    <input 
-                      type="text" 
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', outline: 'none' }}
-                      placeholder="Görevin kısa adı..."
-                      required
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '1.25rem', gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Açıklama</label>
-                    <textarea 
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', outline: 'none', minHeight: '80px', resize: 'vertical' }}
-                      placeholder="Görev detayları..."
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '1.25rem', gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>İlgili Komite / Sayfa</label>
-                    <select 
-                      value={formData.committee} 
-                      onChange={(e) => setFormData({ ...formData, committee: e.target.value })}
-                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', outline: 'none', cursor: 'pointer' }}
-                    >
-                      <option value="">Genel (Hiçbiri)</option>
-                      <option value="proje">Teknoloji ve Proje</option>
-                      <option value="etkinlik">Etkinlik ve Sponsorluk</option>
-                      <option value="sosyal">Sosyal Medya</option>
-                      <option value="medium">Medium</option>
-                    </select>
-                  </div>
-
-                  {/* Öncelik Seçici */}
-                  <div style={{ marginBottom: '1.25rem', gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                      Öncelik Derecesi
-                    </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-                      {PRIORITY_OPTIONS.map(p => {
-                        const isSelected = (formData.priority || 'NORMAL').toUpperCase() === p.id;
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, priority: p.id })}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              padding: '0.65rem 0.5rem',
-                              borderRadius: '10px',
-                              fontSize: '0.8rem',
-                              fontWeight: isSelected ? '800' : '600',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              backgroundColor: isSelected ? p.bg : 'var(--bg-color)',
-                              color: isSelected ? p.color : 'var(--text-muted)',
-                              border: isSelected ? `2px solid ${p.border}` : '1px solid var(--border-color)',
-                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
-                            }}
-                          >
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: p.dot, display: 'inline-block' }} />
-                            {p.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>İlgili Link (İsteğe Bağlı)</label>
-                    <div style={{ position: 'relative' }}>
-                      <LinkIcon size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                      <input 
-                        type="url" 
-                        value={formData.link_url}
-                        onChange={(e) => setFormData({ ...formData, link_url: e.target.value })}
-                        style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.2rem', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.85rem', outline: 'none' }}
-                        placeholder="https://..."
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Dosya Ekle (İsteğe Bağlı)</label>
-                    <label style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.5rem', 
-                      padding: '0.6rem 1rem', 
-                      borderRadius: '10px', 
-                      border: '1px dashed var(--border-color)', 
-                      backgroundColor: 'var(--bg-color)', 
-                      color: 'var(--text-muted)', 
-                      fontSize: '0.85rem', 
-                      cursor: 'pointer',
-                      overflow: 'hidden',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      <Upload size={14} /> 
-                      {selectedFile ? selectedFile.name : (formData.attachment_url ? 'Dosya yüklü' : 'Dosya seç...')}
-                      <input type="file" onChange={(e) => setSelectedFile(e.target.files[0])} style={{ display: 'none' }} />
-                    </label>
-                  </div>
-              </div>
-
-              <div style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Kişi Ata ({formData.assignedUsers.length} Seçili)</label>
-                  {!isAuthorized && (
-                    <span style={{ fontSize: '0.7rem', color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '600', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>
-                      <Lock size={12} /> Yalnızca Yöneticiler Değiştirebilir
-                    </span>
-                  )}
-                </div>
-                
-                {isAuthorized ? (
-                  <>
-                    <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
-                      <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                      <input 
-                        type="text" 
-                        placeholder="Üye veya rütbe ara..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{ width: '100%', padding: '0.6rem 1rem 0.6rem 2.5rem', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.85rem', outline: 'none' }}
-                      />
-                    </div>
-
-                    <div style={{ maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '0.5rem' }}>
-                      {filteredMembers.length > 0 ? filteredMembers.map(member => (
-                        <label key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0.5rem', cursor: 'pointer', borderRadius: '8px', transition: 'background-color 0.2s' }} className="hover-bg">
-                          <input 
-                            type="checkbox" 
-                            checked={formData.assignedUsers.includes(member.id)}
-                            onChange={(e) => {
-                              const updated = e.target.checked 
-                                ? [...formData.assignedUsers, member.id]
-                                : formData.assignedUsers.filter(id => id !== member.id);
-                              setFormData({ ...formData, assignedUsers: updated });
-                            }}
-                          />
-                          <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{member.full_name || member.username}</span>
-                          {member.full_name && member.username && (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>@{member.username}</span>
-                          )}
-                          <span style={{ fontSize: '0.65rem', color: 'var(--primary-color)', backgroundColor: 'var(--primary-bg)', padding: '2px 6px', borderRadius: '4px' }}>{member.rank}</span>
-                        </label>
-                      )) : (
-                        <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Kullanıcı bulunamadı.</div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', minHeight: '44px', alignItems: 'center' }}>
-                    {formData.assignedUsers.length === 0 ? (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Atanan kişi bulunmuyor</span>
-                    ) : (
-                      formData.assignedUsers.map(userId => {
-                        const member = members.find(m => m.id === userId);
-                        const displayName = member ? (member.full_name || member.username) : 'Üye';
-                        return (
-                          <div key={userId} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '8px', backgroundColor: 'var(--surface-color)', border: '1px solid var(--border-color)', fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-main)' }}>
-                            <UserCheck size={14} color="var(--primary-color)" />
-                            <span>{displayName}</span>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={uploading}
-                style={{ 
-                  width: '100%', 
-                  padding: '1rem', 
-                  backgroundColor: uploading ? 'var(--text-muted)' : 'var(--primary-color)', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '12px', 
-                  fontWeight: '700', 
-                  cursor: uploading ? 'not-allowed' : 'pointer', 
-                  boxShadow: '0 4px 6px rgba(15, 118, 110, 0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                {uploading ? 'Yükleniyor...' : (isEditing ? 'Değişiklikleri Kaydet' : 'Görevi Ata ve Yayınla')}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <TaskFormModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSubmit={handleCreateOrUpdateTask}
+        isEditing={isEditing}
+        itemLabel="Görev"
+        subtitle="Görev bilgilerini, ilgili komiteyi ve sorumlu ekip üyelerini belirleyin."
+        formData={formData}
+        setFormData={setFormData}
+        members={members}
+        canManageAssignees={isAuthorized}
+        uploading={uploading}
+        selectedFile={selectedFile}
+        setSelectedFile={setSelectedFile}
+        minDateString={minDateString}
+        maxDateString={maxDateString}
+        committeeSelectOptions={committeeSelectOptions}
+        submitLabel={isEditing ? 'Değişiklikleri Kaydet' : 'Görevi Ata ve Yayınla'}
+      />
     </div>
   );
 };
@@ -584,7 +414,7 @@ const TaskCard = ({ task, isCreator, currentUser, onDelete, onEdit, onToggle }) 
             {priorityMeta.label}
           </span>
         </div>
-        {(isCreator || isAuthorizedRank(currentUser)) && (
+        {(isCreator || isCommitteeManager(currentUser, task.committee)) && (
           <div className="flex gap-2">
             <button onClick={() => onEdit(task)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} title="Düzenle"><Edit2 size={16} /></button>
             <button onClick={() => onDelete(task.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }} title="Sil"><Trash2 size={16} /></button>

@@ -4,16 +4,16 @@ import { apiFetch, API_BASE_URL } from '../../lib/api';
 import { getDateConstraints } from '../../lib/dateConstraints';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
-import { isManager } from '../../lib/roles';
+import { isCommitteeManager } from '../../lib/roles';
 import KanbanCard from './KanbanCard';
 import UpcomingCard from './UpcomingCard';
+import TaskFormModal from './TaskFormModal';
 import { 
-  Plus, AlertCircle, Calendar, X, FileText, Upload, 
-  Link as LinkIcon, Edit2, Search, UserCheck, Check, Lock
+  Plus, AlertCircle, Calendar, X, FileText, 
+  Link as LinkIcon, UserCheck
 } from 'lucide-react';
-import { PRIORITY_OPTIONS, getPriorityMeta } from '../../lib/priority';
+import { getPriorityMeta } from '../../lib/priority';
 import { sanitizeUrl, validateFileUpload } from '../../lib/security';
-import { matchesMember } from '../../lib/search';
 import './CommitteeBoard.css';
 
 const CommitteeBoard = ({
@@ -36,7 +36,6 @@ const CommitteeBoard = ({
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [members, setMembers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const { minDateString, maxDateString } = getDateConstraints();
@@ -114,6 +113,14 @@ const CommitteeBoard = ({
       const dbTasks = data || [];
       setFetchedTasks(dbTasks);
 
+      const formatCardDate = (task) => {
+        const targetDate = task.end_date || task.start_date || task.created_at;
+        if (!targetDate) return '';
+        const parsed = new Date(targetDate);
+        if (Number.isNaN(parsed.getTime())) return '';
+        return parsed.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+      };
+
       const mappedTasks = dbTasks.map(t => {
         const meta = getPriorityMeta(t.priority);
         return {
@@ -127,7 +134,7 @@ const CommitteeBoard = ({
           description: t.description,
           link_url: t.link_url,
           attachment_url: t.attachment_url,
-          time: 'Yeni',
+          time: formatCardDate(t),
           avatars: (t.task_assignments || []).map(a => a.user_name).filter(Boolean)
         };
       });
@@ -183,7 +190,7 @@ const CommitteeBoard = ({
 
   const uploadFile = async (file) => {
     try {
-      const validation = validateFileUpload(file, 15);
+      const validation = validateFileUpload(file, 4);
       if (!validation.valid) {
         toastError(validation.error);
         return null;
@@ -280,7 +287,6 @@ const CommitteeBoard = ({
   };
 
   const openEditModal = (task) => {
-    setSearchTerm('');
     const orig = fetchedTasks.find(t => t.id === task.id);
     setFormData({
       id: task.id,
@@ -301,7 +307,7 @@ const CommitteeBoard = ({
 
   const handleTaskClick = (task) => {
     const orig = fetchedTasks.find(t => t.id === task.id);
-    const userIsManager = isManager(user);
+    const userIsManager = isCommitteeManager(user, committee);
     const isCreator = orig?.creator_id && user?.id && String(orig.creator_id) === String(user.id);
 
     if (userIsManager || isCreator) {
@@ -361,17 +367,16 @@ const CommitteeBoard = ({
       priority: 'NORMAL'
     });
     setSelectedFile(null);
-    setSearchTerm('');
     setIsEditing(false);
   };
 
   const handleDeleteTask = async (id) => {
     if (!canEdit) return;
     const orig = fetchedTasks.find(t => t.id === id);
-    const userIsManager = isManager(user);
+    const userIsManager = isCommitteeManager(user, committee);
     const isCreator = orig?.creator_id && user?.id && String(orig.creator_id) === String(user.id);
     if (!userIsManager && !isCreator) {
-      toastError('Bu görevi silme yetkiniz bulunmuyor. Yalnızca yöneticiler veya görevi oluşturan kişi silebilir.');
+      toastError('Bu görevi silme yetkiniz bulunmuyor. Yalnızca yetkili yöneticiler veya görevi oluşturan kişi silebilir.');
       return;
     }
 
@@ -392,23 +397,9 @@ const CommitteeBoard = ({
     }
   };
 
-  const toggleUserAssignment = (userId) => {
-    setFormData(prev => {
-      const exists = prev.assignedUsers.includes(userId);
-      return {
-        ...prev,
-        assignedUsers: exists 
-          ? prev.assignedUsers.filter(id => id !== userId) 
-          : [...prev.assignedUsers, userId]
-      };
-    });
-  };
-
-  const userIsManager = isManager(user);
+  const userIsManager = isCommitteeManager(user, committee);
   const isTaskCreator = formData.creator_id && user?.id && String(formData.creator_id) === String(user.id);
   const canManageAssignees = userIsManager || (isEditing ? isTaskCreator : true);
-
-  const filteredMembers = members.filter(m => matchesMember(m, searchTerm));
 
   return (
     <div className="page-container">
@@ -514,17 +505,29 @@ const CommitteeBoard = ({
           </div>
           
           <div className="committee-upcoming-list">
-            {fetchedTasks.length > 0 ? fetchedTasks.slice(0, 8).map(task => (
-              <UpcomingCard 
-                key={task.id}
-                month={task.created_at ? new Date(task.created_at).toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase() : 'YENİ'}
-                day={task.created_at ? new Date(task.created_at).getDate() : '-'}
-                dayBg="var(--bg-color)"
-                title={task.title}
-                desc={task.creator_name ? `${task.creator_name} tarafından` : 'Genel'}
-                timeTag={task.task_assignments?.length > 0 ? `${task.task_assignments.length} Kişi Atandı` : 'Atama Bekliyor'}
-              />
-            )) : (
+            {fetchedTasks.length > 0 ? [...fetchedTasks]
+              .sort((a, b) => {
+                const aEnd = a.end_date ? new Date(a.end_date).getTime() : Number.POSITIVE_INFINITY;
+                const bEnd = b.end_date ? new Date(b.end_date).getTime() : Number.POSITIVE_INFINITY;
+                if (aEnd !== bEnd) return aEnd - bEnd;
+                return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+              })
+              .slice(0, 8)
+              .map(task => {
+                const endDate = task.end_date ? new Date(task.end_date) : null;
+                const hasValidEndDate = endDate && !Number.isNaN(endDate.getTime());
+                return (
+                  <UpcomingCard 
+                    key={task.id}
+                    month={hasValidEndDate ? endDate.toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase() : 'BİTİŞ'}
+                    day={hasValidEndDate ? endDate.getDate() : '-'}
+                    dayBg="var(--bg-color)"
+                    title={task.title}
+                    desc={task.creator_name ? `${task.creator_name} tarafından` : 'Genel'}
+                    timeTag={task.task_assignments?.length > 0 ? `${task.task_assignments.length} Kişi Atandı` : 'Atama Bekliyor'}
+                  />
+                );
+              }) : (
               <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                 Henüz bir akış kaydı bulunmuyor.
               </div>
@@ -534,283 +537,25 @@ const CommitteeBoard = ({
       </div>
 
       {/* Görev Ekle / Düzenle Modal */}
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div 
-            style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }} 
-            onClick={() => setShowModal(false)} 
-          />
-          <div 
-            style={{ 
-              position: 'relative', 
-              width: '100%', 
-              maxWidth: '550px', 
-              backgroundColor: 'var(--surface-color)', 
-              borderRadius: '24px', 
-              padding: '2rem', 
-              boxShadow: 'var(--shadow-lg)', 
-              border: '1px solid var(--border-color)', 
-              maxHeight: '90vh', 
-              overflowY: 'auto' 
-            }}
-          >
-            <div className="flex justify-between items-center" style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
-                {isEditing ? `${itemLabel} Düzenle` : `Yeni ${itemLabel}`}
-              </h2>
-              <button 
-                type="button" 
-                onClick={() => setShowModal(false)} 
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateOrUpdateTask}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                    BAŞLIK *
-                  </label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={formData.title} 
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
-                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none' }} 
-                    placeholder={`${itemLabel} başlığı...`} 
-                  />
-                </div>
-
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                    AÇIKLAMA
-                  </label>
-                  <textarea 
-                    value={formData.description} 
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
-                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none', minHeight: '80px', resize: 'vertical' }} 
-                    placeholder="Detaylar ve açıklamalar..." 
-                  />
-                </div>
-
-                <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                      BAŞLANGIÇ TARİHİ
-                    </label>
-                    <input 
-                      type="date" 
-                      min={minDateString} 
-                      max={maxDateString} 
-                      value={formData.start_date} 
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} 
-                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none' }} 
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                      BİTİŞ TARİHİ
-                    </label>
-                    <input 
-                      type="date" 
-                      min={minDateString} 
-                      max={maxDateString} 
-                      value={formData.end_date} 
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} 
-                      style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.9rem', outline: 'none' }} 
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                    İLGİLİ BAĞLANTI
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <LinkIcon size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input 
-                      type="url" 
-                      value={formData.link_url} 
-                      onChange={(e) => setFormData({ ...formData, link_url: e.target.value })} 
-                      style={{ width: '100%', padding: '0.65rem 1rem 0.65rem 2.2rem', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.85rem', outline: 'none' }} 
-                      placeholder="https://..." 
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                    DURUM SÜTUNU
-                  </label>
-                  <select 
-                    value={formData.column_id} 
-                    onChange={(e) => setFormData({ ...formData, column_id: e.target.value })} 
-                    style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.85rem', outline: 'none' }}
-                  >
-                    {columns.map(col => (
-                      <option key={col.id} value={col.id}>{col.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Öncelik Seçici */}
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                    ÖNCELİK SEVİYESİ
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-                    {PRIORITY_OPTIONS.map(p => {
-                      const isSelected = (formData.priority || 'NORMAL').toUpperCase() === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, priority: p.id })}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            padding: '0.65rem 0.5rem',
-                            borderRadius: '10px',
-                            fontSize: '0.8rem',
-                            fontWeight: isSelected ? '800' : '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            backgroundColor: isSelected ? p.bg : 'var(--bg-color)',
-                            color: isSelected ? p.color : 'var(--text-muted)',
-                            border: isSelected ? `2px solid ${p.border}` : '1px solid var(--border-color)',
-                            boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
-                          }}
-                        >
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: p.dot, display: 'inline-block' }} />
-                          {p.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                    EK DOSYA YÜKLE
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <label style={{ flex: 1, border: '1.5px dashed var(--border-color)', borderRadius: '12px', padding: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', backgroundColor: 'var(--bg-color)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      <Upload size={16} /> {selectedFile ? selectedFile.name : 'Dosya Seçin'}
-                      <input type="file" style={{ display: 'none' }} onChange={(e) => setSelectedFile(e.target.files[0] || null)} />
-                    </label>
-                    {selectedFile && (
-                      <button type="button" onClick={() => setSelectedFile(null)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}>
-                        <X size={18} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Kişi Atama Bölümü */}
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>
-                      KİŞİ ATAMA ({formData.assignedUsers.length} Seçili)
-                    </label>
-                    {!canManageAssignees && (
-                      <span style={{ fontSize: '0.7rem', color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '600', backgroundColor: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>
-                        <Lock size={12} /> Yalnızca Yöneticiler Değiştirebilir
-                      </span>
-                    )}
-                  </div>
-                  
-                  {canManageAssignees ? (
-                    <>
-                      <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
-                        <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                        <input 
-                          type="text" 
-                          placeholder="Üye ara..." 
-                          value={searchTerm} 
-                          onChange={(e) => setSearchTerm(e.target.value)} 
-                          style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)', fontSize: '0.8rem', outline: 'none' }} 
-                        />
-                      </div>
-
-                      <div style={{ maxHeight: '130px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem', backgroundColor: 'var(--bg-color)' }}>
-                        {filteredMembers.length === 0 ? (
-                          <div style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                            Eşleşen üye bulunamadı.
-                          </div>
-                        ) : filteredMembers.map(m => {
-                          const isSelected = formData.assignedUsers.includes(m.id);
-                          return (
-                            <div 
-                              key={m.id} 
-                              onClick={() => toggleUserAssignment(m.id)} 
-                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', borderRadius: '6px', cursor: 'pointer', backgroundColor: isSelected ? 'var(--primary-bg)' : 'transparent', marginBottom: '2px' }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ fontSize: '0.8rem', fontWeight: isSelected ? '700' : '500', color: isSelected ? 'var(--primary-color)' : 'var(--text-main)' }}>
-                                  {m.full_name || m.username}
-                                </span>
-                                {m.full_name && m.username && (
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    (@{m.username})
-                                  </span>
-                                )}
-                                {m.rank && (
-                                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                                    [{m.rank}]
-                                  </span>
-                                )}
-                              </div>
-                              {isSelected && <Check size={14} color="var(--primary-color)" />}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', minHeight: '44px', alignItems: 'center' }}>
-                      {formData.assignedUsers.length === 0 ? (
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Atanan kişi bulunmuyor</span>
-                      ) : (
-                        formData.assignedUsers.map(userId => {
-                          const member = members.find(m => m.id === userId);
-                          const displayName = member ? (member.full_name || member.username) : 'Üye';
-                          return (
-                            <div key={userId} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '8px', backgroundColor: 'var(--surface-color)', border: '1px solid var(--border-color)', fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-main)' }}>
-                              <UserCheck size={14} color="var(--primary-color)" />
-                              <span>{displayName}</span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowModal(false)} 
-                  style={{ padding: '0.75rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-main)', fontWeight: '600', cursor: 'pointer' }}
-                >
-                  İptal
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={uploading}
-                  style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: 'none', backgroundColor: 'var(--primary-color)', color: 'white', fontWeight: '700', cursor: uploading ? 'not-allowed' : 'pointer' }}
-                >
-                  {uploading ? 'Yükleniyor...' : (isEditing ? 'Güncelle' : 'Kaydet')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TaskFormModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSubmit={handleCreateOrUpdateTask}
+        isEditing={isEditing}
+        itemLabel={itemLabel}
+        subtitle={`${title} panosu için ${itemLabel.toLowerCase()} bilgilerini ve sorumluları düzenleyin.`}
+        formData={formData}
+        setFormData={setFormData}
+        members={members}
+        canManageAssignees={canManageAssignees}
+        uploading={uploading}
+        selectedFile={selectedFile}
+        setSelectedFile={setSelectedFile}
+        minDateString={minDateString}
+        maxDateString={maxDateString}
+        columns={columns}
+        submitLabel={isEditing ? 'Değişiklikleri Kaydet' : `${itemLabel} Ekle`}
+      />
 
       {/* Üye Bilgi ve Durum Güncelleme Modalı */}
       {showDetailModal && selectedDetailTask && (
