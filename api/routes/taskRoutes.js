@@ -53,9 +53,24 @@ const sanitizeUrl = (url) => {
   return '';
 };
 
-const isManagerOrCreator = (user, creatorId) => {
-  const rank = normalizeRank(user?.rank);
-  return MANAGEMENT_RANKS.includes(rank) || String(user?.id) === String(creatorId);
+const isUserAdmin = (user) => ADMIN_RANKS.includes(normalizeRank(user?.rank));
+const isUserManager = (user) => MANAGEMENT_RANKS.includes(normalizeRank(user?.rank));
+
+const canCreateInCommittee = (user, committee) => {
+  if (isUserAdmin(user)) return true;
+  const normalizedCommittee = sanitizeText(committee, 50) || 'genel';
+  if (normalizedCommittee === 'genel') return isUserManager(user);
+  return Array.isArray(user?.roles) && user.roles.includes(normalizedCommittee);
+};
+
+const canManageTask = (user, task) => {
+  if (!user || !task) return false;
+  if (isUserAdmin(user)) return true;
+  if (String(user.id) === String(task.creator_id)) return true;
+  if (!isUserManager(user)) return false;
+  const committee = task.committee || 'genel';
+  if (committee === 'genel') return true;
+  return Array.isArray(user.roles) && user.roles.includes(committee);
 };
 
 // ========================================================================
@@ -67,6 +82,11 @@ router.post('/', requireAuth, async (req, res) => {
 
     if (!title || !sanitizeText(title)) {
       return res.status(400).json({ error: 'Görev başlığı zorunludur.' });
+    }
+
+    const targetCommittee = sanitizeText(committee, 50) || 'genel';
+    if (!canCreateInCommittee(req.user, targetCommittee)) {
+      return res.status(403).json({ error: 'Bu komitede görev oluşturma yetkiniz bulunmuyor.' });
     }
 
     const isCompleted = (column_id || '').toLowerCase().includes('tamam');
@@ -146,10 +166,10 @@ router.put('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const { title, description, link_url, attachment_url, committee, column_id, priority, assignedUsers, start_date, end_date } = req.body;
 
-    // Check task ownership
+    // Check task ownership & committee authority
     const { data: existingTask, error: fetchError } = await supabase
       .from('tasks')
-      .select('creator_id')
+      .select('creator_id, committee, column_id')
       .eq('id', id)
       .single();
 
@@ -157,10 +177,16 @@ router.put('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Görev bulunamadı.' });
     }
 
-    if (!isManagerOrCreator(req.user, existingTask.creator_id)) {
+    if (!canManageTask(req.user, existingTask)) {
       return res.status(403).json({ error: 'Bu görevi güncelleme yetkiniz bulunmuyor.' });
     }
 
+    const nextCommittee = sanitizeText(committee, 50) || existingTask.committee || 'genel';
+    if (nextCommittee !== (existingTask.committee || 'genel') && !canCreateInCommittee(req.user, nextCommittee)) {
+      return res.status(403).json({ error: 'Görevi yetkili olmadığınız bir komiteye taşıyamazsınız.' });
+    }
+
+    const wasCompleted = (existingTask.column_id || '').toLowerCase().includes('tamam');
     const isCompleted = (column_id || '').toLowerCase().includes('tamam');
     const updatePayload = {
       title: sanitizeText(title, 200),
@@ -187,40 +213,48 @@ router.put('/:id', requireAuth, async (req, res) => {
     }
 
     // Update assignments if provided and user is authorized
-    const rank = normalizeRank(req.user?.rank);
-    const canManageAssignees = MANAGEMENT_RANKS.includes(rank) || String(req.user?.id) === String(existingTask.creator_id);
+    const canManageAssignees = canManageTask(req.user, existingTask);
 
     if (canManageAssignees && Array.isArray(assignedUsers)) {
-      // Get previous assignments for notification diff
+      // Mevcut atamaları koruyarak sadece eklenen/çıkarılan kullanıcıları güncelle
       const { data: prevAssignments } = await supabase
         .from('task_assignments')
         .select('user_id')
         .eq('task_id', id);
-      const prevIds = (prevAssignments || []).map(a => a.user_id);
+      const prevIds = (prevAssignments || []).map(a => String(a.user_id));
+      const nextIds = [...new Set(assignedUsers.map(uid => String(uid)))];
 
-      // Delete old, insert new
-      await supabase.from('task_assignments').delete().eq('task_id', id);
+      const removedIds = prevIds.filter(uid => !nextIds.includes(uid));
+      const addedIds = nextIds.filter(uid => !prevIds.includes(uid));
 
-      if (assignedUsers.length > 0) {
+      if (removedIds.length > 0) {
+        await supabase
+          .from('task_assignments')
+          .delete()
+          .eq('task_id', id)
+          .in('user_id', removedIds);
+      }
+
+      if (addedIds.length > 0) {
         const { data: users } = await supabase
           .from('custom_users')
           .select('id, username, full_name')
-          .in('id', assignedUsers);
+          .in('id', addedIds);
 
         const userMap = {};
-        (users || []).forEach(u => { userMap[u.id] = u.full_name || u.username || 'Bilinmiyor'; });
+        (users || []).forEach(u => { userMap[String(u.id)] = u.full_name || u.username || 'Bilinmiyor'; });
 
-        const assignments = assignedUsers.map(userId => ({
+        const newAssignments = addedIds.map(userId => ({
           task_id: id,
           user_id: userId,
           user_name: userMap[userId] || 'Bilinmiyor',
           status: 'pending'
         }));
 
-        await supabase.from('task_assignments').insert(assignments);
+        await supabase.from('task_assignments').insert(newAssignments);
 
-        // Notify newly assigned users
-        const newlyAssigned = assignedUsers.filter(uid => !prevIds.includes(uid) && uid !== req.user.id);
+        // Yeni atanan kullanıcılara bildirim gönder
+        const newlyAssigned = addedIds.filter(uid => uid !== String(req.user.id));
         if (newlyAssigned.length > 0) {
           const notifications = newlyAssigned.map(userId => ({
             user_id: userId,
@@ -230,6 +264,19 @@ router.put('/:id', requireAuth, async (req, res) => {
           await supabase.from('notifications').insert(notifications);
         }
       }
+    }
+
+    // Eğer sütun Tamamlandı <-> Aktif sınırını geçtiyse atama durumlarını da senkronize et
+    if (wasCompleted && !isCompleted) {
+      await supabase
+        .from('task_assignments')
+        .update({ status: 'pending', completed_at: null })
+        .eq('task_id', id);
+    } else if (!wasCompleted && isCompleted) {
+      await supabase
+        .from('task_assignments')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('task_id', id);
     }
 
     res.json({ message: 'Görev güncellendi.' });
@@ -248,7 +295,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     const { data: existingTask, error: fetchError } = await supabase
       .from('tasks')
-      .select('creator_id')
+      .select('creator_id, committee')
       .eq('id', id)
       .single();
 
@@ -256,7 +303,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Görev bulunamadı.' });
     }
 
-    if (!isManagerOrCreator(req.user, existingTask.creator_id)) {
+    if (!canManageTask(req.user, existingTask)) {
       return res.status(403).json({ error: 'Bu görevi silme yetkiniz bulunmuyor.' });
     }
 
@@ -275,6 +322,22 @@ router.delete('/:id', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Sunucu hatası oluştu.' });
   }
 });
+
+const COMMITTEE_COMPLETED_COLUMNS = {
+  proje: 'TAMAMLANDI',
+  etkinlik: 'TAMAMLANAN',
+  sosyal: 'TAMAMLANAN',
+  medium: 'TAMAMLANDI',
+  genel: 'TAMAMLANAN'
+};
+
+const COMMITTEE_IN_PROGRESS_COLUMNS = {
+  proje: 'DEVAM_EDENLER',
+  etkinlik: 'DEVAM_EDEN',
+  sosyal: 'URETIMDE',
+  medium: 'INCELEMEDE',
+  genel: 'DEVAM_EDEN'
+};
 
 // ========================================================================
 // PUT /api/tasks/:taskId/status — Toggle own assignment status
@@ -312,7 +375,49 @@ router.put('/:taskId/status', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'Durum güncellenemedi.' });
     }
 
-    res.json({ message: 'Görev durumu güncellendi.', status: newStatus });
+    // Komite panosu sütununu tüm atanan kişilerin durumuna göre senkronize et
+    let syncedColumnId = null;
+    let allCompleted = false;
+
+    const [{ data: taskRow }, { data: allAssignments }] = await Promise.all([
+      supabase.from('tasks').select('committee, column_id').eq('id', taskId).maybeSingle(),
+      supabase.from('task_assignments').select('status').eq('task_id', taskId)
+    ]);
+
+    if (taskRow && Array.isArray(allAssignments) && allAssignments.length > 0) {
+      const committeeKey = (taskRow.committee || 'genel').toLowerCase();
+      allCompleted = allAssignments.every(a => a.status === 'completed');
+      const isCurrentlyCompletedCol = (taskRow.column_id || '').toLowerCase().includes('tamam');
+
+      if (allCompleted && !isCurrentlyCompletedCol) {
+        syncedColumnId = COMMITTEE_COMPLETED_COLUMNS[committeeKey] || 'TAMAMLANAN';
+        await supabase
+          .from('tasks')
+          .update({
+            column_id: syncedColumnId,
+            status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', taskId);
+      } else if (!allCompleted && isCurrentlyCompletedCol) {
+        syncedColumnId = COMMITTEE_IN_PROGRESS_COLUMNS[committeeKey] || 'DEVAM_EDEN';
+        await supabase
+          .from('tasks')
+          .update({
+            column_id: syncedColumnId,
+            status: 'pending',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', taskId);
+      }
+    }
+
+    res.json({
+      message: 'Görev durumu güncellendi.',
+      status: newStatus,
+      allCompleted,
+      column_id: syncedColumnId
+    });
   } catch (err) {
     console.error('Status toggle server error:', err);
     res.status(500).json({ error: 'Sunucu hatası oluştu.' });
@@ -334,7 +439,7 @@ router.put('/:taskId/column', requireAuth, async (req, res) => {
     // Görevi ve atanan kişileri doğrula (BOLA / IDOR Koruması)
     const { data: task, error: fetchError } = await supabase
       .from('tasks')
-      .select('id, creator_id, committee, task_assignments(user_id)')
+      .select('id, creator_id, committee, column_id, task_assignments(user_id)')
       .eq('id', taskId)
       .maybeSingle();
 
@@ -342,15 +447,16 @@ router.put('/:taskId/column', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Görev bulunamadı.' });
     }
 
-    const isManager = MANAGEMENT_RANKS.includes(normalizeRank(req.user?.rank));
+    const isAdmin = isUserAdmin(req.user);
     const isCreator = String(req.user?.id) === String(task.creator_id);
     const isAssigned = Array.isArray(task.task_assignments) && task.task_assignments.some(a => String(a.user_id) === String(req.user?.id));
     const hasCommitteeRole = Array.isArray(req.user?.roles) && req.user.roles.includes(task.committee);
 
-    if (!isManager && !isCreator && !isAssigned && !hasCommitteeRole) {
+    if (!isAdmin && !isCreator && !isAssigned && !hasCommitteeRole) {
       return res.status(403).json({ error: 'Bu görevin sütununu değiştirme yetkiniz bulunmuyor.' });
     }
 
+    const wasCompleted = (task.column_id || '').toLowerCase().includes('tamam');
     const isCompleted = column_id.toLowerCase().includes('tamam');
     const { error } = await supabase
       .from('tasks')
@@ -364,6 +470,19 @@ router.put('/:taskId/column', requireAuth, async (req, res) => {
     if (error) {
       console.error('Column move error:', error);
       return res.status(500).json({ error: 'Sütun güncellenemedi.' });
+    }
+
+    // Tamamlandı sütunundan geri çekilince veya tamamlandıya taşınınca atama durumlarını senkronize et
+    if (wasCompleted && !isCompleted) {
+      await supabase
+        .from('task_assignments')
+        .update({ status: 'pending', completed_at: null })
+        .eq('task_id', taskId);
+    } else if (!wasCompleted && isCompleted) {
+      await supabase
+        .from('task_assignments')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('task_id', taskId);
     }
 
     res.json({ message: 'Görev taşındı.' });
@@ -397,9 +516,9 @@ router.post('/upload', requireAuth, async (req, res) => {
       });
     }
 
-    // 15MB limit
-    if (file.size > 15 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Dosya boyutu çok büyük. Maksimum: 15MB.' });
+    // 4MB limit (Vercel Serverless Function 4.5MB gövde sınırı ile uyumlu)
+    if (file.size > 4 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Dosya boyutu çok büyük. Maksimum: 4MB.' });
     }
 
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`;
